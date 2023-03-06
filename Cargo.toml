@@ -1,0 +1,33 @@
+[package]
+name = "c2pa-uniffi"
+version = "0.1.0"
+authors = ["Gavin Peacock <gpeacock@adobe.com"]
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+# This can be whatever name makes sense for your project, but the rest of this tutorial assumes uniffi-bindgen.
+name = "uniffi_bindgen"
+path = "src/bin/uniffi_bindgen.rs"
+
+[dependencies]
+# the sign feature allows signing without file_io, remove no_default_features enable  thumbnail generation
+c2pa = {version="0.18.0", features = ["sign", "file_io", "bmff", "fetch_remote_manifests"]}
+serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1.0"
+serde_json = "1.0"
+serde_with = "2.0.1"
+structopt = {version = "0.3.26"}
+#tokio = { version = "1.25.0", features = ["macros" ]}
+thiserror = "1.0"
+uniffi = "0.23.0"
+
+[build-dependencies]
+uniffi = { version = "0.23.0", features = [ "build", "cli"] }
+
+#[profile.release] 
+#strip = true  # Automatically strip symbols from the binary. 
+#pt-level = "z"  # Optimize for size. 
+#lto = "thin" # Link time optimization.

@@ -1,0 +1,17 @@
+namespace c2pa_uniffi {
+  [Throws=C2paError]
+  string verify_from_file([ByRef] string path);
+  string c2pa_verify_from_file([ByRef] string path);
+  string c2pa_ingredient_from_file([ByRef] string path, [ByRef] string data_dir);
+};
+
+
+[Error]
+enum C2paError {
+  "AssertionConversion",
+  "ManifestConversion",
+  "InputReadError",
+  "InvalidAlgorithm",
+  "Json",
+  "Sdk"
+};
