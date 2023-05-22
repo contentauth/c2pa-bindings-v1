@@ -16,8 +16,22 @@ Run `make release`
 
 Run `make python`
 
-# Testing Python
+# Building for node
 
-Run `make test`
+Run `make build_node`
 
 # Testing C
+
+Run `make test_c`
+
+# Testing python
+
+Run `make test_python`
+
+# Testing node
+
+Run `make test_node`
+
+# Testing all
+
+Run `make test`
