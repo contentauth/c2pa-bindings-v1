@@ -43,6 +43,7 @@ impl Response {
     }
 
     // Returns an error response
+    #[allow(dead_code)]
     pub fn from_error(error: ErrorResponse) -> Self {
         Self::Error(error)
     }
@@ -109,11 +110,13 @@ impl ErrorResponse {
         }
     }
 
+    #[allow(dead_code)]
     pub fn set_code(mut self, code: ErrorCode) -> Self {
         self.code = Some(code);
         self
     }
 
+    #[allow(dead_code)]
     pub fn set_context<S: Into<String>>(mut self, context: S) -> Self {
         self.context = Some(context.into());
         self
@@ -168,7 +171,7 @@ mod test {
         let url = "http:://foo.org".to_string();
         let resp = Response::from_result(Ok(url.clone()));
         if let Response::Ok(url2) = resp {
-            assert_eq!(url2, Some(url))
+            assert_eq!(url2, url)
         } else {
             panic!("wrong response")
         }

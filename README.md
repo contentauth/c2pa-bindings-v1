@@ -4,10 +4,20 @@ This uses the uniffi tools to create language bindings for the Rust c2pa-rs libr
 
 The result is a dynamic library that can be called directly from python
 
-# Testing
+This is a VERY experimental work in progress and will change considerably
 
-Run `make test`
+Adding Manifests does not work here yet
+
+# Building for C (or node)
+
+Run `make release`
 
 # Building for python
 
 Run `make python`
+
+# Testing Python
+
+Run `make test`
+
+# Testing C
