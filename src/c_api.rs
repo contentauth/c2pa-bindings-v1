@@ -20,6 +20,7 @@ use std::{
 use crate::{
     json_api::{add_manifest_to_file_json, ingredient_from_file_json, verify_from_file_json},
     response::Response,
+    signer_info::SignerInfo,
 };
 use c2pa::Result;
 use serde::Serialize;
@@ -81,7 +82,7 @@ pub unsafe extern "C" fn c2pa_supported_formats() -> *mut c_char {
 #[no_mangle]
 pub unsafe extern "C" fn c2pa_has_manifest(path: *const c_char) -> u8 {
     use c2pa::Ingredient;
-    let info = Ingredient::from_file_info(&from_c_str(path));
+    let info = Ingredient::from_file_info(from_c_str(path));
     u8::from(info.provenance().is_some())
 }
 
@@ -147,6 +148,15 @@ pub unsafe extern "C" fn c2pa_ingredient_from_file(
 //     response
 // }
 
+
+#[repr(C)]
+pub struct SignerInfoC {
+    pub signcert: *const c_char,
+    pub pkey: *const c_char,
+    pub alg:  *const c_char,
+    pub tsa_url:  *const c_char,
+}
+
 /// Add a signed manifest to the file at path using auth_token
 /// If cloud is true, upload the manifest to the cloud
 ///
@@ -162,7 +172,7 @@ pub unsafe extern "C" fn c2pa_add_manifest_to_file(
     source_path: *const c_char,
     dest_path: *const c_char,
     manifest: *const c_char,
-    signer_info: *const c_char,
+    signer_info: SignerInfoC,
     //signer: &mut Box<dyn Signer>,
     side_car: bool,
     remote_url: *const c_char,
@@ -176,14 +186,22 @@ pub unsafe extern "C" fn c2pa_add_manifest_to_file(
     } else {
         None
     };
-    let signer_info = from_c_str(signer_info);
-
+    let signer_info = SignerInfo {
+        signcert: from_c_str(signer_info.signcert).into_bytes(),
+        pkey: from_c_str(signer_info.pkey).into_bytes(),
+        alg: from_c_str(signer_info.alg),
+        tsa_url: if signer_info.tsa_url.is_null() {
+            None
+        } else {
+            Some(from_c_str(signer_info.tsa_url))
+        },
+    };
     // Read manifest from JSON and then sign and write it
     let response = add_manifest_to_file_json(
         &source_path,
         &dest_path,
         &manifest,
-        &signer_info,
+        signer_info,
         side_car,
         remote_url,
     );

@@ -1,3 +1,6 @@
+// This is only a test to see if nodejs can call the c2pa library via ffi-napi
+// We are working on a much more advanced nodejs library that will be published
+
 const ffi = require('ffi-napi')
 const ref = require("ref-napi");
 const path = require('path');
@@ -8,7 +11,7 @@ var p = path.join(__dirname,'../../target/release/libc2pa_uniffi.dylib');
 var lib = ffi.Library(p, {
     c2pa_version: [ 'char *' , [ ]],
     c2pa_verify_from_file: [ 'char *' , ['string']],
-    c2pa_add_manifest_to_file: ['char *', ['string','string','string','string','byte']],
+    //c2pa_add_manifest_to_file: ['char *', ['string','string','string','string','byte']],
     c2pa_release_string: ['void', ['char *']]
   });
 

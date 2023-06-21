@@ -15,11 +15,11 @@ keyFile = os.path.join(PROJECT_PATH,"tests","fixtures","es256_private.key")
 testOutputFolder = os.path.join(PROJECT_PATH,"target","pytest")
 testOutputFile = os.path.join(PROJECT_PATH,"target","test.jpg")
 
-with open(pemFile,"r") as f:
-    test_pem = f.read()
+with open(pemFile,"rb") as f:
+    test_pem = bytearray(f.read())
 
-with open(keyFile,"r") as f:
-    test_key = f.read()
+with open(keyFile,"rb") as f:
+    test_key = bytearray(f.read())
 
 try:
     report = c2pa.verify_from_file_json(testFile)
@@ -53,15 +53,9 @@ with open(testFile, mode="rb") as test_file:
 #for a in manifest.assertions:
 #    print(a)
 
+sign_info = c2pa.SignerInfo(test_pem, test_key, "es256", "http://timestamp.digicert.com")
 
-sign_info = json.dumps({
-    "signcert" : pemFile,
-    "pkey" : keyFile,
-    "alg" : "es256",
-    "tsa_url" : "http://timestamp.digicert.com",
-})
-
-#print(sign_info)
+# print(sign_info)
 generator = "python_test/0.1"
 author = "Gavin Peacock"
 
@@ -90,7 +84,7 @@ except Exception as err:
     sys.exit(err)
 
 print("successfully added manifest to file")
-#m = c2pa.C2paManifest.from_json(manifest)
+
 
 #print(m.claim_generator())
 #print(m.to_string())

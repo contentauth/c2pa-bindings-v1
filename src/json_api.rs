@@ -64,12 +64,10 @@ pub fn add_manifest_to_file_json(
     source: &str,
     dest: &str,
     manifest_info: &str,
-    signer_info: &str,
+    signer_info: SignerInfo,
     side_car: bool,
     remote_url: Option<String>,
 ) -> Result<Vec<u8>, Error> {
-    let signer_info = SignerInfo::from_json(signer_info)?;
-    //let signer:Box<dyn Signer> = signer.signer.try_unwrap()?;
 
     let mut manifest = Manifest::from_json(manifest_info)?;
 
@@ -92,6 +90,14 @@ pub fn add_manifest_to_file_json(
             manifest.set_remote_manifest(url);
         } else {
             manifest.set_embedded_manifest_with_remote_ref(url);
+        }
+    }
+
+    // If the source file has a manifest store, and no parent is specified, treat the source's manifest store as the parent.
+    if manifest.parent().is_none() {
+        let source_ingredient = Ingredient::from_file(source)?;
+        if source_ingredient.manifest_data().is_some() {
+            manifest.set_parent(source_ingredient)?;
         }
     }
 

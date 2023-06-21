@@ -47,6 +47,20 @@ extern "C"
 #define DEST_OPTION_CLOUD   0x84   // Upload and embed URL in XMP
 #define DEST_OPTION_BOTH    0x85   // Upload, embed manifest in file and add URL to XMP
 
+/** @brief Provides the information needed to create a signer
+ * 
+ * signcert: pointer a PEM encoded certificate 
+ * pkey: pointer to a PEM encoded private key
+ * alg: signing algorithm ( es256, es384, es512, ps256, ps384, ps512, ed25519)
+ * tsa_url: optional URL to a time stamping authority
+ */
+typedef struct {
+    const char* signcert;
+    const char* pkey;
+    const char* alg;
+    const char* tsa_url;
+} SignInfo;
+
 /** @brief returns a version string for this library
  *
  *  This is formatted as a UserAgent with space separated
@@ -131,11 +145,11 @@ IMPORT extern void* c2pa_create_signer(const char *signcert, const char* pkey, c
  *  @param source_path Path to a file to which we want to add a manifest
  *  @param dest_path Path to write a file with the manifest added. (can be the same as source_path to overwrite)
  *  @param manifest string containing a Manifest Json definition of the manifest to create
- *  @param sign_info string containing a SignInfo Json signing data
+ *  @param sign_info a SignInfo structure defining the signature parameters
  *  @param dest_option Destination settings - See DEST_OPTION_ flags above 
  *  @return char* to a response structure in JSON (must be released with release_string)
  */
-IMPORT extern char* c2pa_add_manifest_to_file(const char *source_path, const char *dest_path, const char* manifest, const void* signer, bool side_car, const char* remote_url);
+IMPORT extern char* c2pa_add_manifest_to_file(const char *source_path, const char *dest_path, const char* manifest, SignInfo signer, bool side_car, const char* remote_url);
 
 
 /** @brief Release string values returned by these functions
