@@ -7,6 +7,9 @@ ifeq ($(OS), Linux)
 CFLAGS = -pthread -Wl,--no-as-needed -ldl -lm
 endif
 
+# default versoion of python is 3.11
+PYTHON=python3.11
+
 release: 
 	cargo build --release --features=uniffi/cli
 
@@ -28,7 +31,7 @@ test_c: release build_c
 	target/ctest
 
 test_python: release
-	python tests/test.py
+	$(PYTHON) tests/test.py
 
 test_node: release build_node
 	cd tests/nodejs && npm start

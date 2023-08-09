@@ -78,27 +78,17 @@ int main(void) {
     char * private_key = load_file("tests/fixtures/es256_private.key");
 
     if (certs && private_key) {
+        // create a sign_info struct
+        SignInfo sign_info = { .alg = "es256", .tsa_url = "http://timestamp.digicert.com", .signcert = certs, .pkey = private_key };
 
-        // create a json string with the certs and private key using SIGN_INFO
-        char * sign_info = malloc(strlen(SIGN_INFO) + strlen(certs) + strlen(private_key) ); 
-
-        //void *signer = c2pa_create_signer(certs, private_key, "es256", "http://timestamp.digicert.com");
-        // printf("sign_info = %s", sign_info);
-        if (sign_info) {
-            sprintf(sign_info, SIGN_INFO, certs, private_key);  
-            result = c2pa_add_manifest_to_file("tests/fixtures/A.jpg", "target/tmp/earth.jpg", manifest, sign_info, false, "http://timestamp.digicert.com");
-            // parse result as json and look for "error" key
-            if (strstr(result, "\"error\":")) {
-                printf("error adding manifest = %s\n", result);
-            } else {
-                printf("added manifest to %s\n", "target/tmp/earth.jpg");
-            }
-            free(sign_info);
-            c2pa_release_string(result);
-            //c2pa_release_signer(signer);
+        result = c2pa_add_manifest_to_file("tests/fixtures/C.jpg", "target/tmp/earth.jpg", manifest, sign_info, false, "http://timestamp.digicert.com");
+        // parse result as json and look for "error" key
+        if (strstr(result, "\"error\":")) {
+            printf("error adding manifest = %s\n", result);
         } else {
-            printf("unable to create signer\n");
+            printf("added manifest to %s\n", "target/tmp/earth.jpg");
         }
+        c2pa_release_string(result);
         free(certs);
         free(private_key);
     } else {
