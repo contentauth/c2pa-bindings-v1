@@ -16,12 +16,11 @@ use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct SignerInfo {
-    pub signcert: String,
-    pub pkey: String,
+    pub signcert: Vec<u8>,
+    pub pkey: Vec<u8>,
     pub alg: String,
     pub tsa_url: Option<String>,
 }
-
 impl SignerInfo {
     pub fn from_json(json: &str) -> Result<Self> {
         serde_json::from_str(json).map_err(Error::JsonError)
@@ -35,17 +34,11 @@ impl SignerInfo {
     }
 
     pub fn signer(&self) -> Result<Box<dyn Signer>> {
-        //let signcert = std::fs::read(&self.signcert)?;
-        //let pkey = std::fs::read(&self.pkey)?;
-        //println!("signcert: {:?}", String::from_utf8(signcert).unwrap());
-        //println!("pkey: {:?}", String::from_utf8(pkey).unwrap());
-        let signcert = std::fs::read(&self.signcert)?;
-        let pkey = std::fs::read(&self.pkey)?;
         create_signer::from_keys(
-            &signcert,
-            &pkey,
+            &self.signcert,
+            &self.pkey,
             self.alg()?,
-            self.tsa_url.as_ref().map(String::to_string),
+            self.tsa_url.clone(),
         )
     }
 }
