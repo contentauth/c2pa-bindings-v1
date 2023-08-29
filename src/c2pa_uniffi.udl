@@ -1,95 +1,46 @@
 
 namespace c2pa {
-  string sdk_version();
-  [Throws=Error]
-  string verify_from_file_json([ByRef] string path);
-  [Throws=Error]
-  string ingredient_from_file_json([ByRef] string path, [ByRef] string data_dir);
-  [Throws=Error]
-  sequence<u8> add_manifest_to_file_json([ByRef] string source, [ByRef] string dest, [ByRef] string manifest, SignerInfo signer_info, boolean side_car, string? remote_url);
-};
-
-dictionary SignerInfo {
-  sequence<u8> signcert;
-  sequence<u8> pkey;
-  string alg;
-  string? tsa_url;
+  string version();
+  sequence<string> supported_extensions();
 };
 
 [Error]
-enum Error {
-    "ClaimMissing",
-    "AssertionMissing",
-    "AssertionEncoding",
-    "AssertionDecoding",
-    "AssertionInvalidRedaction",
-    "AssertionRedactionNotFound",
-    "BadParam",
-    "ClaimEncoding",
-    "ClaimDecoding",
-    "ClaimAlreadySigned",
-    "ClaimMissingSignatureBox",
-    "ClaimMissingIdentity",
-    "ClaimVersion",
-    "ClaimInvalidContent",
-    "ClaimMissingHardBinding",
-    "ClaimSelfRedact",
-    "ClaimDisallowedRedaction",
-    "ClaimUnsigned",
-    "UpdateManifestInvalid",
-    "TooManyManifestStores",
-    "InvalidCoseSignature",
-    "CoseSignatureAlgorithmNotSupported",
-    "CoseMissingKey",
-    "CoseX5ChainMissing",
-    "CoseInvalidCert",
-    "CoseSignature",
-    "CoseVerifier",
-    "CoseCertExpiration",
-    "CoseCertRevoked",
-    "CoseInvalidTimeStamp",
-    "CoseTimeStampValidity",
-    "CoseTimeStampMismatch",
-    "CoseTimeStampGeneration",
-    "CoseTimeStampAuthority",
-    "CoseSigboxTooSmall",
-    "WasmVerifier",
-    "WasmRsaKeyImport",
-    "WasmRsaVerification",
-    "WasmKey",
-    "WasmInvalidContext",
-    "WasmNoCrypto",
-    "JumbfCreationError",
-    "ThreadReceiveError",
-    "JumbfNotFound",
-    "JumbfBoxNotFound",
-    "RemoteManifestFetch",
-    "RemoteManifestUrl",
-    "LogStop",
-    "NotFound",
-    "UnsupportedType",
-    "EmbeddingError",
-    "IngredientNotFound",
-    "FileNotFound",
-    "XmpReadError",
-    "XmpWriteError",
-    "ProvenanceMissing",
-    "HashMismatch",
-    "ClaimVerification",
-    "PdfReadError",
-    "InvalidClaim",
-    "InvalidAsset",
-    "JumbfParseError",
-    "VerifiableCredentialInvalid",
-    "InvalidEcdsaSignature",
-    "IoError",
-    "JsonError",
-    "ImageError",
-    "CborError",
-    "OpenSslError",
-    "OtherError",
-    "PrereleaseError",
-    "MissingFeature",
-    "XmpNotSupported",
-    "XmlWriteError"
+enum C2paError {
+  "Json",
+  "Sdk",
+  "Stream",
+  "RwLock"
+};
+
+[Error]
+interface StreamError {
+  IoError();
+  Other(string reason);
+  InternalStreamError();
+};
+
+enum SeekMode {
+  "Start",
+  "End",
+  "Current"
+};
+
+callback interface ReadStream {
+  [Throws=StreamError]
+  bytes read_stream(u64 length);
+
+  [Throws=StreamError]
+  u64 seek_stream(i64 pos, SeekMode mode);
+};
+
+interface ManifestStoreReader {
+  constructor();
+
+  [Throws=StreamError]
+  string read([ByRef] string format, ReadStream reader);
+
+  [Throws=StreamError]
+  string json();
+
+  bytes? resource([ByRef] string manifest, [ByRef] string id);
 };
