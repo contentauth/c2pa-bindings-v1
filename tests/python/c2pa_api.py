@@ -24,7 +24,8 @@ import c2pa;
 
 ManifestStoreReader = c2pa.ManifestStoreReader
 
-class C2paReader(c2pa.ReadStream):
+# Implements a C2paStream given a file handle
+class C2paStream(c2pa.Stream):
     def __init__(self, file):
         self.file = file
     
@@ -39,9 +40,17 @@ class C2paReader(c2pa.ReadStream):
             whence = 2
         self.file.seek(pos, whence)
 
-    def write_stream(self, data: bytes) -> int:
+    def write_stream(self, data: str) -> int:
         return self.file.write(data)
 
+    def flush_stream(self) -> None:
+        self.file.flush()
+
+    # A shortcut method to open a C2paStream from a path/mode
+    def open_file(path: str, mode: str) -> c2pa.Stream:
+        return C2paStream(open(path, mode))
+
+    
 
 class Manifest:
     def __init__(self, title, format, claim_generator, thumbnail, ingredients, assertions):
@@ -77,4 +86,4 @@ class ManifestStore:
         return ManifestStore(json_dct['active_manifest'],
                 manifests)
 
-__all__ = ["C2paReader", "Manifest", "ManifestStore", "ManifestStoreReader"]
+__all__ = ["C2paStream", "Manifest", "ManifestStore", "ManifestStoreReader"]

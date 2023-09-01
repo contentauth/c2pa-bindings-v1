@@ -10,35 +10,30 @@
 // implied. See the LICENSE-MIT and LICENSE-APACHE files for the
 // specific language governing permissions and limitations under
 // each license.
+use std::cell::RefCell;
+
 
 use thiserror::Error;
 
-// #[derive(Error, Debug)]
-// pub enum StreamError {
-//     #[error("IoError")]
-//     IoError,
-//     #[error("Other Error: {reason}")]
-//     Other { reason: String },
-//     #[error("InternalStreamError")]
-//     InternalStreamError,
+
+// LAST_ERROR handling borrowed Copyright (c) 2018 Michael Bryan
+thread_local! {
+    static LAST_ERROR: RefCell<Option<C2paError>> = RefCell::new(None);
+}
+
+// /// Take the most recent error, clearing `LAST_ERROR` in the process.
+// pub fn take_last_error() -> Option<C2paError> {
+//     LAST_ERROR.with(|prev| prev.borrow_mut().take())
 // }
 
-// impl From<uniffi::UnexpectedUniFFICallbackError> for StreamError {
-//     fn from(err: uniffi::UnexpectedUniFFICallbackError) -> Self {
-//         let err = Self::Other {
-//             reason: err.reason.clone(),
-//         };
-//         println!("{:#}", err);
-//         err
-//     }
+// /// Update the `thread_local` error, taking ownership of the `Error`.
+// pub fn update_last_error<E: Into<C2paError>>(err: E) {
+//     LAST_ERROR.with(|prev| *prev.borrow_mut() = Some(err.into()));
 // }
 
-// impl From<C2paError> for StreamError {
-//     fn from(e: C2paError) -> Self {
-//         Self::Other {
-//             reason: e.to_string(),
-//         }
-//     }
+// /// Peek at the most recent error and get its error message as a Rust `String`.
+// pub fn error_message() -> Option<String> {
+//     LAST_ERROR.with(|prev| prev.borrow().as_ref().map(|e| format!("{:#}", e)))
 // }
 
 use crate::StreamError;
@@ -51,11 +46,33 @@ pub enum C2paError {
     #[error(transparent)]
     Sdk(#[from] c2pa::Error),
 
+    #[error("Api Error: {0}")]
+    Ffi(String),
+
     #[error(transparent)]
     Stream(StreamError),
 
     #[error("Read Write Lock failure")]
     RwLock,
+}
+
+impl C2paError {
+
+    /// Returns the last error as String
+    pub fn last_message() -> Option<String> {
+        LAST_ERROR.with(|prev| prev.borrow().as_ref().map(|e| e.to_string()))
+    }
+
+    /// Sets the last error
+    pub fn set_last(self) {
+        LAST_ERROR.with(|prev| *prev.borrow_mut() = Some(self));
+    }
+
+    /// Takes the the last error and clears it
+    pub fn take_last() -> Option<C2paError> {
+        LAST_ERROR.with(|prev| prev.borrow_mut().take())
+    }
+
 }
 
 pub type Result<T> = std::result::Result<T, C2paError>;

@@ -33,14 +33,14 @@ class TestManifestStoreReader(unittest.TestCase):
 
     def test_normal_read(self):
         with open(testPath, "rb") as file:
-            reader = c2pa_api.C2paReader(file)
+            reader = c2pa_api.C2paStream(file)
             manifestStore = c2pa_api.ManifestStoreReader()
             json = manifestStore.read("image/jpeg",reader)
             self.assertIn("C.jpg", json)
 
     def test_normal_read_and_parse(self):
         with open(testPath, "rb") as file:
-            reader = c2pa_api.C2paReader(file)
+            reader = c2pa_api.C2paStream(file)
             manifestStore = c2pa_api.ManifestStoreReader()
             manifestStore.read("image/jpeg",reader)
             json = manifestStore.json()
@@ -55,7 +55,7 @@ class TestManifestStoreReader(unittest.TestCase):
     def test_reader_bad_format(self):
         with self.assertRaises(c2pa_api.c2pa.StreamError.Other):
             with open(testPath, "rb") as file:
-                reader = c2pa_api.C2paReader(file)
+                reader = c2pa_api.C2paStream(file)
                 manifestStore = c2pa_api.ManifestStoreReader()
                 json = manifestStore.read("badFormat",reader)
 

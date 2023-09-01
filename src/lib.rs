@@ -19,17 +19,17 @@ mod manifest_builder;
 mod manifest_store_reader;
 mod stream;
 
-use c2pa::{jumbf_io::get_supported_types, Error as c2paError, Result as c2paResult, Signer};
+use c2pa::jumbf_io::get_supported_types;
 
 pub use error::{C2paError, Result};
 
-pub use c_api::C2paReader;
+pub use c_api::C2paStream;
 pub use ingredient_builder::IngredientBuilder;
 pub use manifest_builder::ManifestBuilder;
 pub use manifest_store_reader::ManifestStoreReader;
-pub use stream::{ReadStream, SeekMode, StreamError, StreamResult};
+pub use stream::{Stream, SeekMode, StreamError, StreamResult};
 
-uniffi::include_scaffolding!("c2pa_uniffi");
+uniffi::include_scaffolding!("c2pa");
 
 /// Returns the version of the C2PA library
 pub fn version() -> String {

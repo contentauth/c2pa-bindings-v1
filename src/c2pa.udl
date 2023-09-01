@@ -7,6 +7,7 @@ namespace c2pa {
 [Error]
 enum C2paError {
   "Json",
+  "Ffi",
   "Sdk",
   "Stream",
   "RwLock"
@@ -25,22 +26,29 @@ enum SeekMode {
   "Current"
 };
 
-callback interface ReadStream {
+callback interface Stream {
   [Throws=StreamError]
   bytes read_stream(u64 length);
 
   [Throws=StreamError]
   u64 seek_stream(i64 pos, SeekMode mode);
+
+  [Throws=StreamError]
+  u64 write_stream(bytes data);
 };
 
 interface ManifestStoreReader {
   constructor();
 
   [Throws=StreamError]
-  string read([ByRef] string format, ReadStream reader);
+  string read([ByRef] string format, Stream reader);
 
   [Throws=StreamError]
   string json();
 
-  bytes? resource([ByRef] string manifest, [ByRef] string id);
+  [Throws=StreamError]
+  bytes resource([ByRef] string manifest, [ByRef] string id);
+
+  [Throws=StreamError]
+  void resource_write([ByRef] string manifest, [ByRef] string id, Stream stream);
 };

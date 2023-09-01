@@ -11,7 +11,7 @@
 // specific language governing permissions and limitations under
 // each license.
 
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom, Write};
 use thiserror::Error;
 
 use crate::error::C2paError;
@@ -53,12 +53,21 @@ impl From<C2paError> for StreamError {
     }
 }
 
-pub trait ReadStream: Send + Sync {
+/// This allows for a callback stream over the Uniffi interface.
+/// Implement these stream functions in the foreign language
+/// and this will provide Rust Stream trait implementations
+/// This is necessary since the Rust traits cannot be implemented directly
+/// as uniffi callbacks
+pub trait Stream: Send + Sync {
+    /// Read a stream of bytes from the stream
     fn read_stream(&self, length: u64) -> StreamResult<Vec<u8>>;
+    /// Seek to a position in the stream
     fn seek_stream(&self, pos: i64, mode: SeekMode) -> StreamResult<u64>;
+    /// Write a stream of bytes to the stream
+    fn write_stream(&self, data: Vec<u8>) -> StreamResult<u64>;
 }
 
-impl Read for dyn ReadStream {
+impl Read for dyn Stream {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let mut bytes = self
             .read_stream(buf.len() as u64)
@@ -71,7 +80,7 @@ impl Read for dyn ReadStream {
     }
 }
 
-impl Seek for dyn ReadStream {
+impl Seek for dyn Stream {
     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
         let (pos, mode) = match pos {
             SeekFrom::Current(pos) => (pos, SeekMode::Current),
@@ -80,5 +89,18 @@ impl Seek for dyn ReadStream {
         };
         self.seek_stream(pos, mode)
             .map_err(|_| std::io::Error::last_os_error())
+    }
+}
+
+impl Write for dyn Stream {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let len = self
+            .write_stream(buf.to_vec())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        Ok(len as usize)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }

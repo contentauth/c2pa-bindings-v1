@@ -23,19 +23,29 @@ import c2pa_api
 
 testFile = os.path.join(PROJECT_PATH,"tests","fixtures","C.jpg")
 file = open(testFile, "rb") 
-reader = c2pa_api.C2paReader(file)
+stream = c2pa_api.C2paStream(file)
 manifestStore = c2pa_api.ManifestStoreReader()
-json = manifestStore.read("image/jpeg",reader)
+json = manifestStore.read("image/jpeg",stream)
 print(json)
 
 manifest_store = c2pa_api.ManifestStore.from_json(json)
 
-activeManifest = manifest_store.activeManifest
-print(activeManifest)
-if activeManifest: 
-    manifest = manifest_store.manifests[activeManifest]
+manifest_label = manifest_store.activeManifest
+print(manifest_label)
+if manifest_label: 
+    manifest = manifest_store.manifests[manifest_label]
     thumb_id = manifest.thumbnail["identifier"]
-    thumb = manifestStore.resource(activeManifest, thumb_id)
+    thumb = manifestStore.resource(manifest_label, thumb_id)
     print(len(thumb))
+    # now write the thumbnail to a file
+    thumb_file = os.path.join(PROJECT_PATH,"target","thumb_from_python.jpg")
+    if os.path.exists(thumb_file):
+        os.remove(thumb_file)
+    #if not os.path.exists(os.path.dirname(thumb_file)):
+    #    os.makedirs(os.path.dirname(thumb_file))
+    thumbOut = c2pa_api.C2paStream.open_file(thumb_file, "wb")
+    manifestStore.resource_write(manifest_label, thumb_id, thumbOut)
+    if not os.path.exists(thumb_file):
+        print("Failed to write thumbnail")
 
 

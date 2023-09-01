@@ -19,11 +19,11 @@ test_c: release
 	target/ctest
 
 python: release
-	cargo run --release --features=uniffi/cli --bin uniffi_bindgen generate src/c2pa_uniffi.udl -n --language python -o target/python
+	cargo run --release --features=uniffi/cli --bin uniffi_bindgen generate src/c2pa.udl -n --language python -o target/python
 	cp target/release/libc2pa_bindings.dylib target/python/libuniffi_c2pa.dylib
 
 swift: release
-	cargo run --release --features=uniffi/cli --bin uniffi_bindgen generate src/c2pa_uniffi.udl -n --language swift -o target/swift
+	cargo run --release --features=uniffi/cli --bin uniffi_bindgen generate src/c2pa.udl -n --language swift -o target/swift
 	cp target/release/libc2pa_bindings.dylib target/swift/libuniffi_c2pa.dylib
 
 test_python: python

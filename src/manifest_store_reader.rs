@@ -16,11 +16,14 @@ use crate::{
     StreamError,
 };
 use c2pa::ManifestStore;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, Write};
 use std::sync::RwLock;
 
 struct ReaderSettings {}
 
+/// The ManifestStoreReader reads the manifest store from a stream and then
+/// provides access to the store via the json() and resource() methods.
+///  
 pub struct ManifestStoreReader {
     _settings: ReaderSettings,
     store: RwLock<ManifestStore>,
@@ -34,6 +37,21 @@ impl ManifestStoreReader {
         }
     }
 
+    /// Reads the manifest store from a stream
+    /// # Arguments
+    /// * `format` - the format of the manifest store
+    /// * `stream` - the stream to read from
+    /// # Returns
+    /// * `Result<String>` - the json representation of the manifest store
+    ///    or an error
+    /// 
+    /// # Example
+    /// ```
+    /// use c2pa::ManifestStore;
+    /// use c2pa::ManifestStoreReader; 
+    /// use std::io::Cursor;
+    ///     
+    //
     pub fn read(&self, format: &str, mut stream: impl Read + Seek) -> Result<String> {
         // todo: use ManifestStore::from_stream, when it exists
         let mut bytes = Vec::new();
@@ -52,23 +70,58 @@ impl ManifestStoreReader {
         Ok(json)
     }
 
+    /// returns a json representation of the manifest store
+    /// # Returns
+    /// * `Result<String>` - the json representation of the manifest store
+    ///     or an error
+    /// 
     pub fn json(&self) -> Result<String> {
         self.store
             .try_read()
             .map(|store| (*store).to_string())
-            .map_err(|_| C2paError::RwLock)
+            .map_err(|e| C2paError::RwLock)
     }
 
-    pub fn resource(&self, manifest: &str, id: &str) -> Option<Vec<u8>> {
+    /// returns a resource from the manifest store
+    /// # Arguments
+    /// * `manifest` - the manifest id
+    /// * `id` - the resource id
+    /// # Returns
+    /// * `Option<Vec<u8>>` - the resource bytes
+    /// 
+    pub fn resource(&self, manifest: &str, id: &str) -> Result<Vec<u8>> {
         if let Ok(store) = self.store.try_read() {
-            return store.manifests().get(manifest).and_then(|manifest| {
-                match manifest.resources().get(id) {
-                    Ok(r) => Some(r.into_owned()),
-                    Err(_) => None,
+            match store.manifests().get(manifest) {
+                Some(manifest) => {
+                    match manifest.resources().get(id) {
+                        Ok(r) => Ok(r.into_owned()),
+                        Err(e) => {
+                            Err(C2paError::Sdk(e))
+                        }
+                    }
+                },
+                None => {
+                    Err(C2paError::Sdk(c2pa::Error::ResourceNotFound(manifest.to_string())))
                 }
-            });
+            }
         } else {
-            None
+            return Err(C2paError::RwLock);
         }
+    }
+
+    /// writes a resource from the manifest store to the stream
+    /// # Arguments
+    /// * `manifest` - the manifest id
+    /// * `id` - the resource id
+    /// * `stream` - the stream to write to
+    /// # Returns
+    /// * `Result<()>` - Ok or an error
+    /// 
+    pub fn resource_write(&self, manifest_label: &str, id: &str, mut stream: impl Write + Seek) -> Result<()> {
+        self.resource(manifest_label, id).and_then(|bytes| stream.write_all(&bytes).map_err(|e| {
+            C2paError::Stream(StreamError::Other {
+                reason: e.to_string(),
+            })
+        }))
     }
 }

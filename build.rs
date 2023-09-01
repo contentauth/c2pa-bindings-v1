@@ -1,3 +1,3 @@
 fn main() {
-    uniffi::generate_scaffolding("./src/c2pa_uniffi.udl").unwrap();
+    uniffi::generate_scaffolding("./src/c2pa.udl").unwrap();
 }
