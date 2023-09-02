@@ -19,15 +19,14 @@ mod manifest_builder;
 mod manifest_store_reader;
 mod stream;
 
-use c2pa::jumbf_io::get_supported_types;
-
-pub use error::{C2paError, Result};
-
 pub use c_api::C2paStream;
+pub use error::{C2paError, Result};
 pub use ingredient_builder::IngredientBuilder;
 pub use manifest_builder::ManifestBuilder;
 pub use manifest_store_reader::ManifestStoreReader;
-pub use stream::{Stream, SeekMode, StreamError, StreamResult};
+pub use stream::{SeekMode, Stream, StreamError, StreamResult};
+
+use c2pa::jumbf_io::get_supported_types;
 
 uniffi::include_scaffolding!("c2pa");
 

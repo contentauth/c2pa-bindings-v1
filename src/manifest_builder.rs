@@ -13,10 +13,12 @@
 
 use crate::error::{C2paError, Result};
 use c2pa::Manifest;
-use std::io::{Read, Seek, Write};
-use std::sync::RwLock;
+use std::{
+    io::{Read, Seek, Write},
+    sync::RwLock,
+};
 
-struct Signer {}
+//pub struct Signer {}
 
 pub struct ManifestBuilderSettings {}
 

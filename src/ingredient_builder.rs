@@ -21,8 +21,8 @@ use c2pa::Ingredient;
 pub struct IngredientBuilderSettings {}
 
 pub struct IngredientBuilder {
-    settings: IngredientBuilderSettings,
-    ingredient: RwLock<Ingredient>,
+    pub settings: IngredientBuilderSettings,
+    pub ingredient: RwLock<Ingredient>,
 }
 
 impl IngredientBuilder {

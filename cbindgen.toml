@@ -30,8 +30,5 @@ after_includes = """
 [export.rename]
 "C2paConfigC" = "C2paConfig"
 
-[export]
-include = ["ReadCallback", "SeekCallback"]
-
 [fn]
 prefix = "IMPORT extern"

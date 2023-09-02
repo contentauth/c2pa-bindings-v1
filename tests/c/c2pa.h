@@ -33,22 +33,36 @@
 /**
  * The ManifestStoreReader reads the manifest store from a stream and then
  * provides access to the store via the json() and resource() methods.
- *
  */
 typedef struct ManifestStoreReader ManifestStoreReader;
 
+/**
+ * An Opaque struct to hold a context value for the stream callbacks
+ */
 typedef struct StreamContext {
 
 } StreamContext;
 
+/**
+ * Defines a callback to read from a stream
+ */
 typedef intptr_t (*ReadCallback)(const struct StreamContext *context, uint8_t *data, uintptr_t len);
 
+/**
+ * Defines a callback to seek to an offset in a stream
+ */
 typedef int (*SeekCallback)(const struct StreamContext *context, long offset, int mode);
 
+/**
+ * Defines a callback to write to a stream
+ */
 typedef intptr_t (*WriteCallback)(const struct StreamContext *context,
                                   const uint8_t *data,
                                   uintptr_t len);
 
+/**
+ * A C2paStream is a Rust Read/Write/Seek stream that can be used in C
+ */
 typedef struct C2paStream {
   struct StreamContext *context;
   ReadCallback read;
@@ -116,7 +130,6 @@ IMPORT extern char *c2pa_supported_extensions(void);
  * Returns an error field if there were errors
  *
  * # Safety
- * Reads from a null terminated C string
  * The returned value MUST be released by calling release_string
  * and it is no longer valid after that call.
  */

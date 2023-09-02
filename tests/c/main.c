@@ -19,23 +19,23 @@
 const char * asset_path = "tests/fixtures/A.jpg";
 
 ssize_t reader(size_t context, uint8_t *data, size_t len) {
-    printf("reader: context = %zu, data = %p, len = %zu\n", context, data, len);
+    // printf("reader: context = %zu, data = %p, len = %zu\n", context, data, len);
     return fread(data, 1, len, (FILE*)context);
 }
 
 int seeker(size_t context,long int offset, int whence) {
-    printf("seeker: context = %zu, offset = %ld, whence = %d\n", context, offset, whence);
+    // printf("seeker: context = %zu, offset = %ld, whence = %d\n", context, offset, whence);
     return fseek((FILE*)context, offset, whence);
 }
 
 int writer(size_t context, uint8_t *data, size_t len) {
-    printf("writer: context = %zu, data = %p, len = %zu\n", context, data, len);
+    // printf("writer: context = %zu, data = %p, len = %zu\n", context, data, len);
     return fwrite(data, 1, len, (FILE*)context);
 }
 
 C2paStream* create_stream(FILE *file) {
     if (file != NULL) {
-       return c2pa_create_stream(file, reader, seeker, writer);
+       return c2pa_create_stream((StreamContext*)file, (ReadCallback)reader, (SeekCallback) seeker, (WriteCallback)writer);
     }
     return NULL;
 }
@@ -103,19 +103,18 @@ int main(void) {
 		return 1;
 	}
     //printf("input_file = %zu\n", input_file);
-	C2paStream* input_stream = c2pa_create_stream(input_file, reader, seeker, writer);
+	C2paStream* input_stream = create_stream(input_file);
     if (input_stream == NULL) {
         printf("error creating stream = %s\n", c2pa_error());
         return 1;
     }
-
     // char* result = c2pa_verify_stream(*file);
     // if (result == NULL) {
     //     result = c2pa_error();
     // }
     // printf("result = %s\n", result);
 
-    void* manifest_reader = c2pa_manifest_reader_new();
+    ManifestStoreReader* manifest_reader = c2pa_manifest_reader_new();
     if (manifest_reader == NULL) {
         printf("manifest new err = %s\n", c2pa_error());
         return 1;
@@ -153,7 +152,7 @@ int main(void) {
 		return 1;
 	}
     // create a c2pa stream for the thumbnail
-    C2paStream* thumb_stream = c2pa_create_stream(thumb_file, reader, seeker, writer);
+    C2paStream* thumb_stream = create_stream(thumb_file);
     if (thumb_stream == NULL) {
         printf("error creating thumb stream = %s\n", c2pa_error());
         return 1;

@@ -12,9 +12,7 @@
 // each license.
 use std::cell::RefCell;
 
-
 use thiserror::Error;
-
 
 // LAST_ERROR handling borrowed Copyright (c) 2018 Michael Bryan
 thread_local! {
@@ -57,7 +55,6 @@ pub enum C2paError {
 }
 
 impl C2paError {
-
     /// Returns the last error as String
     pub fn last_message() -> Option<String> {
         LAST_ERROR.with(|prev| prev.borrow().as_ref().map(|e| e.to_string()))
@@ -72,7 +69,6 @@ impl C2paError {
     pub fn take_last() -> Option<C2paError> {
         LAST_ERROR.with(|prev| prev.borrow_mut().take())
     }
-
 }
 
 pub type Result<T> = std::result::Result<T, C2paError>;

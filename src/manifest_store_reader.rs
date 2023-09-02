@@ -16,20 +16,27 @@ use crate::{
     StreamError,
 };
 use c2pa::ManifestStore;
-use std::io::{Read, Seek, Write};
-use std::sync::RwLock;
+use std::{
+    io::{Read, Seek, Write},
+    sync::RwLock,
+};
 
 struct ReaderSettings {}
 
 /// The ManifestStoreReader reads the manifest store from a stream and then
 /// provides access to the store via the json() and resource() methods.
-///  
 pub struct ManifestStoreReader {
     _settings: ReaderSettings,
     store: RwLock<ManifestStore>,
 }
 
 impl ManifestStoreReader {
+    /// Creates a new ManifestStoreReader
+    /// # Returns
+    /// * `ManifestStoreReader` - the new ManifestStoreReader
+    ///
+    /// # Safety
+    /// The ManifestStoreReader is not thread safe. It is intended to be used
     pub fn new() -> Self {
         Self {
             _settings: ReaderSettings {},
@@ -44,14 +51,7 @@ impl ManifestStoreReader {
     /// # Returns
     /// * `Result<String>` - the json representation of the manifest store
     ///    or an error
-    /// 
-    /// # Example
-    /// ```
-    /// use c2pa::ManifestStore;
-    /// use c2pa::ManifestStoreReader; 
-    /// use std::io::Cursor;
-    ///     
-    //
+    ///
     pub fn read(&self, format: &str, mut stream: impl Read + Seek) -> Result<String> {
         // todo: use ManifestStore::from_stream, when it exists
         let mut bytes = Vec::new();
@@ -74,12 +74,12 @@ impl ManifestStoreReader {
     /// # Returns
     /// * `Result<String>` - the json representation of the manifest store
     ///     or an error
-    /// 
+    ///
     pub fn json(&self) -> Result<String> {
         self.store
             .try_read()
             .map(|store| (*store).to_string())
-            .map_err(|e| C2paError::RwLock)
+            .map_err(|_e| C2paError::RwLock)
     }
 
     /// returns a resource from the manifest store
@@ -88,24 +88,20 @@ impl ManifestStoreReader {
     /// * `id` - the resource id
     /// # Returns
     /// * `Option<Vec<u8>>` - the resource bytes
-    /// 
+    ///
     pub fn resource(&self, manifest: &str, id: &str) -> Result<Vec<u8>> {
         if let Ok(store) = self.store.try_read() {
             match store.manifests().get(manifest) {
-                Some(manifest) => {
-                    match manifest.resources().get(id) {
-                        Ok(r) => Ok(r.into_owned()),
-                        Err(e) => {
-                            Err(C2paError::Sdk(e))
-                        }
-                    }
+                Some(manifest) => match manifest.resources().get(id) {
+                    Ok(r) => Ok(r.into_owned()),
+                    Err(e) => Err(C2paError::Sdk(e)),
                 },
-                None => {
-                    Err(C2paError::Sdk(c2pa::Error::ResourceNotFound(manifest.to_string())))
-                }
+                None => Err(C2paError::Sdk(c2pa::Error::ResourceNotFound(
+                    manifest.to_string(),
+                ))),
             }
         } else {
-            return Err(C2paError::RwLock);
+            Err(C2paError::RwLock)
         }
     }
 
@@ -116,12 +112,25 @@ impl ManifestStoreReader {
     /// * `stream` - the stream to write to
     /// # Returns
     /// * `Result<()>` - Ok or an error
-    /// 
-    pub fn resource_write(&self, manifest_label: &str, id: &str, mut stream: impl Write + Seek) -> Result<()> {
-        self.resource(manifest_label, id).and_then(|bytes| stream.write_all(&bytes).map_err(|e| {
-            C2paError::Stream(StreamError::Other {
-                reason: e.to_string(),
+    ///
+    pub fn resource_write(
+        &self,
+        manifest_label: &str,
+        id: &str,
+        mut stream: impl Write + Seek,
+    ) -> Result<()> {
+        self.resource(manifest_label, id).and_then(|bytes| {
+            stream.write_all(&bytes).map_err(|e| {
+                C2paError::Stream(StreamError::Other {
+                    reason: e.to_string(),
+                })
             })
-        }))
+        })
+    }
+}
+
+impl Default for ManifestStoreReader {
+    fn default() -> Self {
+        Self::new()
     }
 }
