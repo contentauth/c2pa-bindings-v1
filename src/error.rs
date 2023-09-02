@@ -42,6 +42,9 @@ pub enum C2paError {
     Json(#[from] serde_json::Error),
 
     #[error(transparent)]
+    Io(#[from] std::io::Error),
+
+    #[error(transparent)]
     Sdk(#[from] c2pa::Error),
 
     #[error("Api Error: {0}")]
@@ -70,5 +73,16 @@ impl C2paError {
         LAST_ERROR.with(|prev| prev.borrow_mut().take())
     }
 }
+
+impl From<StreamError> for C2paError {
+    fn from(e: StreamError) -> Self {
+        match e {
+            StreamError::Io{ reason }  => Self::Io(std::io::Error::new(std::io::ErrorKind::Other, reason)),
+            StreamError::Other { reason } => Self::Ffi(reason),
+            StreamError::InternalStreamError => Self::Stream(e),
+        }
+    }
+}
+
 
 pub type Result<T> = std::result::Result<T, C2paError>;

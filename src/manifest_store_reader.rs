@@ -11,10 +11,7 @@
 // specific language governing permissions and limitations under
 // each license.
 
-use crate::{
-    error::{C2paError, Result},
-    StreamError,
-};
+use crate::error::{C2paError, Result};
 use c2pa::ManifestStore;
 use std::{
     io::{Read, Seek, Write},
@@ -55,11 +52,7 @@ impl ManifestStoreReader {
     pub fn read(&self, format: &str, mut stream: impl Read + Seek) -> Result<String> {
         // todo: use ManifestStore::from_stream, when it exists
         let mut bytes = Vec::new();
-        let _len = stream.read_to_end(&mut bytes).map_err(|e| {
-            C2paError::Stream(StreamError::Other {
-                reason: e.to_string(),
-            })
-        })?;
+        let _len = stream.read_to_end(&mut bytes).map_err(C2paError::Io)?;
         let store = ManifestStore::from_bytes(format, &bytes, true).map_err(C2paError::Sdk)?;
         let json = store.to_string();
         if let Ok(mut st) = self.store.try_write() {
@@ -120,12 +113,8 @@ impl ManifestStoreReader {
         mut stream: impl Write + Seek,
     ) -> Result<()> {
         self.resource(manifest_label, id).and_then(|bytes| {
-            stream.write_all(&bytes).map_err(|e| {
-                C2paError::Stream(StreamError::Other {
-                    reason: e.to_string(),
-                })
+            stream.write_all(&bytes).map_err(C2paError::Io)
             })
-        })
     }
 }
 

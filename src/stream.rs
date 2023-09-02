@@ -27,9 +27,9 @@ pub enum SeekMode {
 
 #[derive(Error, Debug)]
 pub enum StreamError {
-    #[error("IoError")]
-    IoError,
-    #[error("Other Error: {reason}")]
+    #[error("Io: {reason}")]
+    Io{ reason: String },
+    #[error("Other: {reason}")]
     Other { reason: String },
     #[error("InternalStreamError")]
     InternalStreamError,
@@ -40,7 +40,6 @@ impl From<uniffi::UnexpectedUniFFICallbackError> for StreamError {
         let err = Self::Other {
             reason: err.reason.clone(),
         };
-        println!("{:#}", err);
         err
     }
 }
