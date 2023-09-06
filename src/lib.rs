@@ -22,7 +22,7 @@ mod stream;
 pub use c_api::C2paStream;
 pub use error::{C2paError, Result};
 pub use ingredient_builder::IngredientBuilder;
-pub use manifest_builder::ManifestBuilder;
+pub use manifest_builder::{ManifestBuilder, ManifestBuilderSettings};
 pub use manifest_store_reader::ManifestStoreReader;
 pub use stream::{SeekMode, Stream, StreamError, StreamResult};
 

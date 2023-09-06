@@ -13,6 +13,7 @@
 
 import sys
 import os
+import json
 PROJECT_PATH = os.getcwd()
 SOURCE_PATH = os.path.join(
     PROJECT_PATH,"target","python"
@@ -25,10 +26,10 @@ testFile = os.path.join(PROJECT_PATH,"tests","fixtures","C.jpg")
 file = open(testFile, "rb") 
 stream = c2pa_api.C2paStream(file)
 manifestStore = c2pa_api.ManifestStoreReader()
-json = manifestStore.read("image/jpeg",stream)
-print(json)
+report = manifestStore.read("image/jpeg",stream)
+print(report)
 
-manifest_store = c2pa_api.ManifestStore.from_json(json)
+manifest_store = c2pa_api.ManifestStore.from_json(report)
 
 manifest_label = manifest_store.activeManifest
 print(manifest_label)
@@ -47,5 +48,33 @@ if manifest_label:
     manifestStore.resource_write(manifest_label, thumb_id, thumbOut)
     if not os.path.exists(thumb_file):
         print("Failed to write thumbnail")
+    else:
+        print("Thumbnail written to " + thumb_file)
 
+manifest = {
+    "claim_generator": "python_test",
+    "claim_generator_info": [{
+        "name": "python_test",
+        "version": "0.0.1",
+    }],
+    "ingredients": [],
+    "assertions": [
+        {   'label': 'stds.schema-org.CreativeWork',
+            'data': {
+                '@context': 'http://schema.org/',
+                '@type': 'CreativeWork',
+                'author': [
+                    {   '@type': 'Person',
+                        'name': 'Gavin Peacock'
+                    }
+                ]
+            },
+            'kind': 'Json'
+        }
+    ]
+ }
 
+settings = c2pa_api.c2pa.ManifestBuilderSettings("foo") #{ 'generator': "foo" }
+manifest_builder = c2pa_api.c2pa.ManifestBuilder(settings)
+manifest_builder.from_json(json.dumps(manifest))
+manifest_builder.sign(stream, None)

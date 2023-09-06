@@ -24,13 +24,13 @@ import c2pa;
 
 ManifestStoreReader = c2pa.ManifestStoreReader
 
-# Implements a C2paStream given a file handle
+# Implements a C2paStream given a stream handle
 class C2paStream(c2pa.Stream):
-    def __init__(self, file):
-        self.file = file
+    def __init__(self, stream):
+        self.stream = stream
     
     def read_stream(self, length: int) -> bytes:   
-        return self.file.read(length)
+        return self.stream.read(length)
 
     def seek_stream(self, pos: int, mode: c2pa.SeekMode) -> int:
         whence = 0
@@ -38,13 +38,13 @@ class C2paStream(c2pa.Stream):
             whence = 1
         elif mode == c2pa.SeekMode.End:
             whence = 2
-        self.file.seek(pos, whence)
+        self.stream.seek(pos, whence)
 
     def write_stream(self, data: str) -> int:
-        return self.file.write(data)
+        return self.stream.write(data)
 
     def flush_stream(self) -> None:
-        self.file.flush()
+        self.stream.flush()
 
     # A shortcut method to open a C2paStream from a path/mode
     def open_file(path: str, mode: str) -> c2pa.Stream:

@@ -53,3 +53,15 @@ interface ManifestStoreReader {
   [Throws=StreamError]
   void resource_write([ByRef] string manifest, [ByRef] string id, Stream stream);
 };
+
+dictionary ManifestBuilderSettings {
+  string generator;
+};
+
+interface ManifestBuilder {
+  constructor([ByRef] ManifestBuilderSettings settings);
+  [Throws=C2paError]
+  void from_json([ByRef] string json);
+  [Throws=C2paError]
+  void sign(Stream input, Stream? output);
+};

@@ -103,3 +103,11 @@ impl Write for dyn Stream {
         Ok(())
     }
 }
+
+impl c2pa::CAIRead for dyn Stream {
+
+}
+
+impl c2pa::CAIRead for Box<dyn Stream> {
+
+}

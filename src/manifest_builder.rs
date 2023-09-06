@@ -18,18 +18,37 @@ use std::{
     sync::RwLock,
 };
 
+struct CAIReadWrapper<'a> {
+    pub reader: &'a mut dyn c2pa::CAIRead,
+}
+
+impl Read for CAIReadWrapper<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.reader.read(buf)
+    }
+}
+
+impl Seek for CAIReadWrapper<'_> {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.reader.seek(pos)
+    }
+}
+
+
 //pub struct Signer {}
 
-pub struct ManifestBuilderSettings {}
+pub struct ManifestBuilderSettings {
+    pub generator: String
+}
 
 pub struct ManifestBuilder {
     manifest: RwLock<Manifest>,
 }
 
 impl ManifestBuilder {
-    pub fn new(_settings: &ManifestBuilderSettings) -> Self {
+    pub fn new(settings: &ManifestBuilderSettings) -> Self {
         Self {
-            manifest: RwLock::new(Manifest::new("test")),
+            manifest: RwLock::new(Manifest::new(settings.generator.clone())),
         }
     }
 
@@ -59,27 +78,24 @@ impl ManifestBuilder {
         Ok(self)
     }
 
+ 
+
     pub fn sign(
-        &mut self,
-        input: impl Read + Seek,
+        &self,
+        mut input: impl c2pa::CAIRead,
         _output: Option<impl Read + Write + Seek>,
-        _c2pa_data: Option<impl Write>,
+        //_c2pa_data: Option<impl Write>,
     ) -> Result<()> {
-        let _input = std::io::Cursor::new(input);
-        if let Ok(_manifest) = self.manifest.try_read() {
-            // let result = manifest.embed_stream(manifest.format(), input, Signer).map_err(C2paError::Sdk)?;
-            // return store
-            //     .manifests()
-            //     .get(manifest)
-            //     .and_then(|manifest|
-            //         match manifest.resources().get(id) {
-            //             Ok(r) => {
-            //                 Some(r.into_owned())
-            //             }
-            //             Err(_) => {
-            //                 None
-            //             }
-            //         })
+        //let _input = std::io::Cursor::new(input);
+        let size = input.seek(std::io::SeekFrom::End(0)).expect("SeekTest failed");
+        println!("Stream size = {}", size);
+        if let Ok(mut manifest) = self.manifest.try_write() {
+            let format = manifest.format().to_string();
+            let signer = c2pa::create_signer::from_files("tests/fixtures/es256_certs.pem", "tests/fixtures/es256_private.key", c2pa::SigningAlg::Es256, None).map_err(C2paError::Sdk)?;
+            let result = manifest.embed_stream(&format, &mut input,  &*signer).map_err(C2paError::Sdk).expect("Failed to embed stream");
+            if let Some(mut output) = _output {
+                output.write_all(&result).map_err(C2paError::Io)?;
+            };
             Ok(())
         } else {
             Err(C2paError::RwLock)
