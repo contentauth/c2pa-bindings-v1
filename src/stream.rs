@@ -28,7 +28,7 @@ pub enum SeekMode {
 #[derive(Error, Debug)]
 pub enum StreamError {
     #[error("Io: {reason}")]
-    Io{ reason: String },
+    Io { reason: String },
     #[error("Other: {reason}")]
     Other { reason: String },
     #[error("InternalStreamError")]

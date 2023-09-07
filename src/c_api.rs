@@ -230,7 +230,7 @@ pub unsafe extern "C" fn c2pa_supported_extensions() -> *mut c_char {
 /// The returned value MUST be released by calling release_string
 /// and it is no longer valid after that call.
 #[no_mangle]
-pub unsafe extern "C" fn c2pa_verify_stream(reader: C2paStream) -> *mut c_char {
+pub unsafe extern "C" fn c2pa_verify_stream(reader: &C2paStream) -> *mut c_char {
     let manifest_store = ManifestStoreReader::new();
     let result = manifest_store.read("image/jpeg", reader);
     let str = match result {
@@ -292,7 +292,7 @@ pub unsafe extern "C" fn c2pa_manifest_reader_read(
 ) -> *mut c_char {
     let reader = Box::from_raw(*reader_ptr);
     let format = from_c_str(format);
-    let result = reader.read(&format, stream);
+    let result = reader.read(&format, &stream);
     let str = match result {
         Ok(json) => json,
         Err(e) => {

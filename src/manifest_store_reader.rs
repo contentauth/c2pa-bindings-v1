@@ -12,11 +12,31 @@
 // each license.
 
 use crate::error::{C2paError, Result};
+use crate::C2paStream;
+use c2pa::CAIRead;
 use c2pa::ManifestStore;
 use std::{
     io::{Read, Seek, Write},
     sync::RwLock,
 };
+
+pub struct CAIReadAdapter<'a> {
+    pub reader: &'a C2paStream,
+}
+
+impl<'a> CAIRead for CAIReadAdapter<'a> {}
+
+impl<'a> Read for CAIReadAdapter<'a> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.reader.read(buf)
+    }
+}
+
+impl<'a> Seek for CAIReadAdapter<'a> {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.reader.seek(pos)
+    }
+}
 
 struct ReaderSettings {}
 
@@ -49,10 +69,13 @@ impl ManifestStoreReader {
     /// * `Result<String>` - the json representation of the manifest store
     ///    or an error
     ///
-    pub fn read(&self, format: &str, mut stream: impl Read + Seek) -> Result<String> {
+    pub fn read(&self, format: &str, stream: &C2paStream) -> Result<String> {
         // todo: use ManifestStore::from_stream, when it exists
         let mut bytes = Vec::new();
-        let _len = stream.read_to_end(&mut bytes).map_err(C2paError::Io)?;
+        //let _len = stream.read_to_end(&mut bytes).map_err(C2paError::Io)?;
+        let mut reader = CAIReadAdapter{ reader: stream, };
+        reader.read_to_end(&mut bytes).map_err(C2paError::Io)?;
+
         let store = ManifestStore::from_bytes(format, &bytes, true).map_err(C2paError::Sdk)?;
         let json = store.to_string();
         if let Ok(mut st) = self.store.try_write() {
@@ -112,9 +135,8 @@ impl ManifestStoreReader {
         id: &str,
         mut stream: impl Write + Seek,
     ) -> Result<()> {
-        self.resource(manifest_label, id).and_then(|bytes| {
-            stream.write_all(&bytes).map_err(C2paError::Io)
-            })
+        self.resource(manifest_label, id)
+            .and_then(|bytes| stream.write_all(&bytes).map_err(C2paError::Io))
     }
 }
 
