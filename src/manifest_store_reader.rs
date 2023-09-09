@@ -11,7 +11,10 @@
 // specific language governing permissions and limitations under
 // each license.
 
-use crate::error::{C2paError, Result};
+use crate::{
+    error::{C2paError, Result},
+    Stream,
+};
 use c2pa::ManifestStore;
 use std::{
     io::{Read, Seek, Write},
@@ -39,6 +42,26 @@ impl ManifestStoreReader {
             _settings: ReaderSettings {},
             store: RwLock::new(ManifestStore::new()),
         }
+    }
+
+    /// Reads the manifest store from a stream
+    /// # Arguments
+    /// * `format` - the format of the manifest store
+    /// * `stream` - the stream to read from
+    /// # Returns
+    /// * `Result<String>` - the json representation of the manifest store
+    ///    or an error
+    ///
+    //pub fn read(&self, format: &str, mut stream: impl Read + Seek) -> Result<String> {
+    pub fn read_stream(&self, format: &str, stream: Box<dyn Stream>) -> Result<String> {
+        // todo: use ManifestStore::from_stream, when it exists
+
+        // let x_ptr = stream as *const dyn Stream as *mut dyn Stream;
+        // let x_mut_ref = unsafe { &mut *x_ptr };
+        let stream_ptr = &*stream as *const dyn Stream as *mut dyn Stream;
+        let stream_ptr = unsafe { &mut *stream_ptr };
+        let mut stream = crate::stream::StreamAdapter::from_stream(stream_ptr);
+        self.read(format, &mut stream)
     }
 
     /// Reads the manifest store from a stream
@@ -112,14 +135,30 @@ impl ManifestStoreReader {
         id: &str,
         mut stream: impl Write + Seek,
     ) -> Result<()> {
-        self.resource(manifest_label, id).and_then(|bytes| {
-            stream.write_all(&bytes).map_err(C2paError::Io)
-            })
+        self.resource(manifest_label, id)
+            .and_then(|bytes| stream.write_all(&bytes).map_err(C2paError::Io))
     }
 }
 
 impl Default for ManifestStoreReader {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_manifest_store_reader() {
+        let input = std::fs::File::open("tests/fixtures/C.jpg").expect("Failed to open test file");
+        let reader = ManifestStoreReader::new();
+        let json = reader.read("image/jpeg", input).unwrap();
+        println!("Json = {}", json);
+        assert!(json.contains("\"format\": \"image/jpeg\""));
+        assert!(json.contains("\"title\": \"C.jpg\""));
+        assert!(!json.contains("\"validation_status\":"));
     }
 }

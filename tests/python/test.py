@@ -26,7 +26,7 @@ testFile = os.path.join(PROJECT_PATH,"tests","fixtures","C.jpg")
 file = open(testFile, "rb") 
 stream = c2pa_api.C2paStream(file)
 manifestStore = c2pa_api.ManifestStoreReader()
-report = manifestStore.read("image/jpeg",stream)
+report = manifestStore.read_stream("image/jpeg",stream)
 print(report)
 
 manifest_store = c2pa_api.ManifestStore.from_json(report)
@@ -57,6 +57,7 @@ manifest = {
         "name": "python_test",
         "version": "0.0.1",
     }],
+    "format": "image/jpeg",
     "ingredients": [],
     "assertions": [
         {   'label': 'stds.schema-org.CreativeWork',
@@ -74,7 +75,14 @@ manifest = {
     ]
  }
 
+#stream.seek_stream(0,c2pa_api.c2pa.SeekMode.Begin)
+testFile = os.path.join(PROJECT_PATH,"tests","fixtures","C.jpg")
+file = open(testFile, "rb") 
+stream = c2pa_api.C2paStream(file)
 settings = c2pa_api.c2pa.ManifestBuilderSettings("foo") #{ 'generator': "foo" }
 manifest_builder = c2pa_api.c2pa.ManifestBuilder(settings)
 manifest_builder.from_json(json.dumps(manifest))
-manifest_builder.sign(stream, None)
+outFile = os.path.join(PROJECT_PATH,"target","python_out.jpg")
+file = open(outFile, "wb") 
+output = c2pa_api.C2paStream(file)
+manifest_builder.sign_stream(stream, output)

@@ -11,6 +11,8 @@
 // specific language governing permissions and limitations under
 // each license.
 
+use c2pa::jumbf_io::get_supported_types;
+
 mod c_api;
 /// This module exports a C2PA library
 mod error;
@@ -24,9 +26,10 @@ pub use error::{C2paError, Result};
 pub use ingredient_builder::IngredientBuilder;
 pub use manifest_builder::{ManifestBuilder, ManifestBuilderSettings};
 pub use manifest_store_reader::ManifestStoreReader;
-pub use stream::{SeekMode, Stream, StreamError, StreamResult};
+pub use stream::{SeekMode, Stream, StreamAdapter, StreamError, StreamResult};
 
-use c2pa::jumbf_io::get_supported_types;
+#[cfg(test)]
+mod test_stream;
 
 uniffi::include_scaffolding!("c2pa");
 

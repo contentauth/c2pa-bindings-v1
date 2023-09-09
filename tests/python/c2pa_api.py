@@ -34,11 +34,12 @@ class C2paStream(c2pa.Stream):
 
     def seek_stream(self, pos: int, mode: c2pa.SeekMode) -> int:
         whence = 0
-        if mode == c2pa.SeekMode.Current:
+        if mode is c2pa.SeekMode.CURRENT:
             whence = 1
-        elif mode == c2pa.SeekMode.End:
+        elif mode is c2pa.SeekMode.END:
             whence = 2
-        self.stream.seek(pos, whence)
+        #print("Seeking to " + str(pos) + " with whence " + str(whence))
+        return self.stream.seek(pos, whence)
 
     def write_stream(self, data: str) -> int:
         return self.stream.write(data)

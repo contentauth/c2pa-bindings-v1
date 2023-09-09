@@ -42,7 +42,7 @@ interface ManifestStoreReader {
   constructor();
 
   [Throws=StreamError]
-  string read([ByRef] string format, Stream reader);
+  string read_stream([ByRef] string format, Stream reader);
 
   [Throws=StreamError]
   string json();
@@ -60,8 +60,10 @@ dictionary ManifestBuilderSettings {
 
 interface ManifestBuilder {
   constructor([ByRef] ManifestBuilderSettings settings);
+  
   [Throws=C2paError]
   void from_json([ByRef] string json);
+
   [Throws=C2paError]
-  void sign(Stream input, Stream? output);
+  void sign_stream(Stream input, Stream? output);
 };

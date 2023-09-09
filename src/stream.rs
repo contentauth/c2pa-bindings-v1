@@ -12,6 +12,7 @@
 // each license.
 
 use std::io::{Read, Seek, SeekFrom, Write};
+
 use thiserror::Error;
 
 use crate::error::C2paError;
@@ -28,7 +29,7 @@ pub enum SeekMode {
 #[derive(Error, Debug)]
 pub enum StreamError {
     #[error("Io: {reason}")]
-    Io{ reason: String },
+    Io { reason: String },
     #[error("Other: {reason}")]
     Other { reason: String },
     #[error("InternalStreamError")]
@@ -104,10 +105,101 @@ impl Write for dyn Stream {
     }
 }
 
-impl c2pa::CAIRead for dyn Stream {
-
+pub struct StreamAdapter<'a> {
+    pub reader: &'a mut dyn Stream,
 }
 
-impl c2pa::CAIRead for Box<dyn Stream> {
+impl<'a> StreamAdapter<'a> {
+    pub fn from_stream(reader: &'a mut dyn Stream) -> Self {
+        Self { reader }
+    }
+}
 
+impl<'a> c2pa::CAIRead for StreamAdapter<'a> {}
+
+impl<'a> c2pa::CAIReadWrite for StreamAdapter<'a> {}
+
+impl<'a> Read for StreamAdapter<'a> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let mut bytes = self
+            .reader
+            .read_stream(buf.len() as u64)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let len = bytes.len();
+        buf.iter_mut().zip(bytes.drain(..)).for_each(|(dest, src)| {
+            *dest = src;
+        });
+        //println!("read: {:?}", len);
+        Ok(len)
+    }
+}
+
+impl<'a> Seek for StreamAdapter<'a> {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        let (pos, mode) = match pos {
+            SeekFrom::Current(pos) => (pos, SeekMode::Current),
+            SeekFrom::Start(pos) => (pos as i64, SeekMode::Start),
+            SeekFrom::End(pos) => (pos, SeekMode::End),
+        };
+        //println!("Stream Seek {}", pos);
+        self.reader
+            .seek_stream(pos, mode)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+}
+
+impl<'a> Write for StreamAdapter<'a> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let len = self
+            .reader
+            .write_stream(buf.to_vec())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        Ok(len as usize)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::test_stream::TestStream;
+
+    #[test]
+    fn test_stream_read() {
+        let mut test = TestStream::from_memory(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        let mut stream = StreamAdapter::from_stream(&mut test);
+        let mut buf = [0u8; 5];
+        let len = stream.read(&mut buf).unwrap();
+        assert_eq!(len, 5);
+        assert_eq!(buf, [0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_stream_seek() {
+        let mut test = TestStream::from_memory(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        let mut stream = StreamAdapter { reader: &mut test };
+        let pos = stream.seek(SeekFrom::Start(5)).unwrap();
+        assert_eq!(pos, 5);
+        let mut buf = [0u8; 5];
+        let len = stream.read(&mut buf).unwrap();
+        assert_eq!(len, 5);
+        assert_eq!(buf, [5, 6, 7, 8, 9]);
+    }
+
+    #[test]
+    fn test_stream_write() {
+        let mut test = TestStream::new();
+        let mut stream = StreamAdapter { reader: &mut test };
+        let len = stream.write(&[0, 1, 2, 3, 4]).unwrap();
+        assert_eq!(len, 5);
+        stream.seek(SeekFrom::Start(0)).unwrap();
+        let mut buf = [0u8; 5];
+        let len = stream.read(&mut buf).unwrap();
+        assert_eq!(len, 5);
+        assert_eq!(buf, [0, 1, 2, 3, 4]);
+    }
 }
