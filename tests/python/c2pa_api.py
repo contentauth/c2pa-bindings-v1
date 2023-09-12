@@ -51,21 +51,30 @@ class C2paStream(c2pa.Stream):
     def open_file(path: str, mode: str) -> c2pa.Stream:
         return C2paStream(open(path, mode))
 
-    
+class LocalSigner(c2pa.SignerCallback):
+
+    def __init__(self, config, private_key):
+        self.config = config
+        self.private_key = private_key
+
+    def sign(self, data: bytes) -> bytes:
+        return c2pa.local_sign(data, self.private_key)
 
 class Manifest:
-    def __init__(self, title, format, claim_generator, thumbnail, ingredients, assertions):
+    def __init__(self, title, format, claim_generator, thumbnail, ingredients, assertions, sig_info=None):
         self.title = title
         self.format = format
         self.claim_generator = claim_generator
         self.thumbnail = thumbnail
         self.ingredients = ingredients
         self.assertions = assertions
+        self.signature_info = sig_info
 
 class ManifestStore:
-    def __init__(self, activeManifest, manifests):
+    def __init__(self, activeManifest, manifests, validationStatus=None):
         self.activeManifest = activeManifest
         self.manifests = manifests
+        self.validationStatus = validationStatus
         
     def __str__(self):
         return json.dumps(dict(self), ensure_ascii=False)
@@ -76,15 +85,16 @@ class ManifestStore:
         manifests = {}
         for label, manifest in json_dct["manifests"].items():
             manifests[label] = Manifest(
-                manifest["title"],
-                manifest["format"],
-                manifest["claim_generator"],
-                manifest["thumbnail"],
-                manifest["ingredients"],
-                manifest["assertions"]
+                manifest.get("title"),
+                manifest.get("format"),
+                manifest.get("claim_generator"),
+                manifest.get("thumbnail"),
+                manifest.get("ingredients"),
+                manifest.get("assertions"),
+                manifest.get("signature_info")
             )
 
         return ManifestStore(json_dct['active_manifest'],
-                manifests)
+                manifests, json_dct.get('validation_status'))
 
 __all__ = ["C2paStream", "Manifest", "ManifestStore", "ManifestStoreReader"]

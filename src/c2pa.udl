@@ -2,6 +2,9 @@
 namespace c2pa {
   string version();
   sequence<string> supported_extensions();
+
+  [Throws=C2paError]
+  bytes local_sign([ByRef] bytes data, [ByRef] bytes pkey);
 };
 
 [Error]
@@ -9,6 +12,7 @@ enum C2paError {
   "Json",
   "Io",
   "Ffi",
+  "Other",
   "Sdk",
   "Stream",
   "RwLock"
@@ -66,4 +70,28 @@ interface ManifestBuilder {
 
   [Throws=C2paError]
   void sign_stream(Stream input, Stream? output);
+};
+
+dictionary SignerConfig {
+  string alg;
+
+  bytes certs;
+
+  u64 reserve_size;
+
+  string? time_authority_url = null;
+
+  bytes? ocsp_val = null;
+};
+
+callback interface SignerCallback {
+  [Throws=StreamError]
+  bytes sign(bytes data);
+};
+
+interface C2paSigner {
+  constructor(SignerCallback callback);
+
+  [Throws=C2paError]
+  void configure([ByRef] SignerConfig config);
 };

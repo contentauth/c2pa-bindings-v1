@@ -86,3 +86,24 @@ outFile = os.path.join(PROJECT_PATH,"target","python_out.jpg")
 file = open(outFile, "wb") 
 output = c2pa_api.C2paStream(file)
 manifest_builder.sign_stream(stream, output)
+
+
+pemFile = os.path.join(PROJECT_PATH,"tests","fixtures","temp_cert.data")
+keyFile = os.path.join(PROJECT_PATH,"tests","fixtures","temp_priv_key.data")
+
+with open(pemFile,"rb") as f:
+    certs = bytearray(f.read())
+
+with open(keyFile,"rb") as f:
+    private_key = bytearray(f.read())
+
+
+signerConfig = c2pa_api.c2pa.SignerConfig("ps256", certs, 1000 , "http://timestamp.digicert.com")
+
+signer = c2pa_api.LocalSigner(signerConfig, private_key)
+
+file = open(testFile, "rb") 
+bytes = bytearray(file.read())
+signature = signer.sign(bytes)
+
+print(signature)

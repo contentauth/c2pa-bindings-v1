@@ -37,6 +37,7 @@
 typedef struct ManifestStoreReader ManifestStoreReader;
 
 /**
+ * Defines a callback to read from a stream
  * An Opaque struct to hold a context value for the stream callbacks
  */
 typedef struct StreamContext {

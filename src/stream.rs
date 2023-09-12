@@ -38,10 +38,9 @@ pub enum StreamError {
 
 impl From<uniffi::UnexpectedUniFFICallbackError> for StreamError {
     fn from(err: uniffi::UnexpectedUniFFICallbackError) -> Self {
-        let err = Self::Other {
+        Self::Other {
             reason: err.reason.clone(),
-        };
-        err
+        }
     }
 }
 

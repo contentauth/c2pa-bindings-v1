@@ -30,6 +30,10 @@ type SeekCallback =
 type WriteCallback =
     unsafe extern "C" fn(context: *const StreamContext, data: *const u8, len: usize) -> isize;
 
+/// Defines a callback to read from a stream
+// type SignerCallback =
+//     unsafe extern "C" fn(data: *mut u8, len: usize, signature: *mut *mut u8) -> isize;
+
 #[repr(C)]
 #[derive(Debug)]
 /// An Opaque struct to hold a context value for the stream callbacks
@@ -344,6 +348,11 @@ pub unsafe extern "C" fn c2pa_manifest_reader_resource(
     }
     *reader_ptr = Box::into_raw(reader);
 }
+
+// #[no_mangle]
+// pub unsafe extern "C" fn c2pa_create_signer(data: *const SignerData, signer: *const SingerCallback) -> *const Signer {
+//     Err(Error::UnsupportedType)
+// }
 
 /// Releases a string allocated by Rust
 ///

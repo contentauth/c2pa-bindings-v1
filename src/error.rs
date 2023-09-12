@@ -50,6 +50,9 @@ pub enum C2paError {
     #[error("Api Error: {0}")]
     Ffi(String),
 
+    #[error("Other Error: {0}")]
+    Other(String),
+
     #[error(transparent)]
     Stream(StreamError),
 
