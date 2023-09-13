@@ -25,19 +25,16 @@ pub(crate) struct TestSigner {
 impl TestSigner {
     pub fn new() -> Self {
         Self {
-            //private_key: include_bytes!("../tests/fixtures/ps256.pem").to_vec(),
-            private_key: include_bytes!("../tests/fixtures/temp_priv_key.data").to_vec(),
+            private_key: include_bytes!("../tests/fixtures/ps256.pem").to_vec(),
         }
     }
 
     pub fn config(&self) -> SignerConfig {
         SignerConfig {
-            alg: "es256".to_string(),
-            //certs: include_bytes!("../tests/fixtures/ps256.pub").to_vec(),
-            certs: include_bytes!("../tests/fixtures/temp_cert.data").to_vec(),
-            reserve_size: 1024,
+            alg: "ps256".to_string(),
+            certs: include_bytes!("../tests/fixtures/ps256.pub").to_vec(),
             time_authority_url: None,
-            ocsp_val: None,
+            use_ocsp: false,
         }
     }
 }
@@ -47,7 +44,7 @@ impl SignerCallback for TestSigner {
         local_sign(&data, &self.private_key).map_err(|e| StreamError::Other {
             reason: e.to_string(),
         })
-}
+    }
 }
 
 pub fn local_sign(data: &[u8], pkey: &[u8]) -> Result<Vec<u8>> {
@@ -55,8 +52,8 @@ pub fn local_sign(data: &[u8], pkey: &[u8]) -> Result<Vec<u8>> {
 }
 
 fn openssl_rsa256_sign(data: &[u8], pkey: &[u8]) -> std::result::Result<Vec<u8>, ErrorStack> {
-    let rsa = Rsa::private_key_from_pem(pkey).expect("Failed to read private key");
-    let pkey = PKey::from_rsa(rsa).expect("Failed to create PKey");
+    let rsa = Rsa::private_key_from_pem(pkey)?;
+    let pkey = PKey::from_rsa(rsa)?;
     let mut signer = openssl::sign::Signer::new(MessageDigest::sha256(), &pkey)?;
 
     signer.set_rsa_padding(openssl::rsa::Padding::PKCS1_PSS)?; // use C2PA recommended padding

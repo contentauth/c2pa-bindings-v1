@@ -66,6 +66,7 @@ impl ManifestBuilder {
 
     pub fn sign_stream(
         &self,
+        signer: &crate::signer::C2paSigner,
         input: Box<dyn Stream>,
         output: Option<impl Read + Write + Seek>,
         //_c2pa_data: Option<impl Write>,
@@ -73,29 +74,21 @@ impl ManifestBuilder {
         let input_ref = &*input as *const dyn Stream as *mut dyn Stream;
         let input_ref = unsafe { &mut *input_ref };
         let mut input = StreamAdapter::from_stream(input_ref);
-        self.sign(&mut input, output)
+        self.sign(signer, &mut input, output)
     }
 
     pub fn sign(
         &self,
+        signer: &dyn c2pa::Signer,
         input: &mut StreamAdapter,
         output: Option<impl Read + Write + Seek>,
         //_c2pa_data: Option<impl Write>,
     ) -> Result<()> {
         if let Ok(mut manifest) = self.manifest.try_write() {
             let format = manifest.format().to_string();
-            //println!("Format = {}", format);
-            let signer = c2pa::create_signer::from_files(
-                "tests/fixtures/es256_certs.pem",
-                "tests/fixtures/es256_private.key",
-                c2pa::SigningAlg::Es256,
-                None,
-            )
-            .map_err(C2paError::Sdk)?;
             let result = manifest
-                .embed_stream(&format, input, &*signer)
-                .map_err(C2paError::Sdk)
-                .expect("Failed to embed stream");
+                .embed_stream(&format, input, signer)
+                .map_err(C2paError::Sdk)?;
             if let Some(mut output) = output {
                 output.write_all(&result).map_err(C2paError::Io)?;
             };
@@ -134,11 +127,19 @@ mod tests {
         let mut input = TestStream::from_memory(IMAGE.to_vec());
         let mut input = StreamAdapter::from_stream(&mut input);
         let mut output = Cursor::new(Vec::new());
+        let signer = c2pa::create_signer::from_files(
+            "tests/fixtures/ps256.pub",
+            "tests/fixtures/ps256.pem",
+            c2pa::SigningAlg::Ps256,
+            None,
+        )
+        .map_err(C2paError::Sdk)
+        .expect("Failed to create signer");
         builder
-            .sign(&mut input, Some(&mut output))
+            .sign(&*signer, &mut input, Some(&mut output))
             .expect("Failed to sign");
         let result = output.into_inner();
-        assert_eq!(result.len(), 128977);
+        assert_eq!(result.len(), 134165);
     }
 
     #[test]
@@ -152,11 +153,15 @@ mod tests {
             .expect("Failed to load manifest Json");
         let input = TestStream::from_memory(IMAGE.to_vec());
         let mut output = Cursor::new(Vec::new());
+        let test_signer = Box::new(crate::test_signer::TestSigner::new());
+        let config = test_signer.config();
+        let signer = crate::signer::C2paSigner::new(test_signer);
+        signer.configure(&config).expect("Signer config failed");
         builder
-            .sign_stream(Box::new(input), Some(&mut output))
+            .sign_stream(&signer, Box::new(input), Some(&mut output))
             .expect("Failed to sign");
         let result = output.into_inner();
         // std::fs::write("target/manifest_builder.jpg", &result).expect("Failed to write test file");
-        assert_eq!(result.len(), 128977);
+        assert_eq!(result.len(), 143141);
     }
 }

@@ -22,7 +22,31 @@ sys.path.append(SOURCE_PATH)
 
 import c2pa;
 
-ManifestStoreReader = c2pa.ManifestStoreReader
+#  ManifestStoreReader = c2pa.ManifestStoreReader
+class ManifestStoreReader(c2pa.ManifestStoreReader):
+    def __init__(self, format, stream):
+        self.format = format
+        self.stream = C2paStream(stream)
+        super().__init__()
+
+    def from_file(path: str, format=None):
+        file = open(path, "rb")
+        if format is None:
+            # determine the format from the file extension
+            format = os.path.splitext(path)[1][1:]
+        reader = ManifestStoreReader(format, file)
+        #reader.read() # read the manifest
+        return reader
+
+    def read(self):
+        return super().read_stream(self.format, self.stream)
+    
+    def resource_to_stream(self, manifest_label, resource_id, stream) -> None:
+        super().resource_write(manifest_label, resource_id, C2paStream(stream))
+
+    def resource_to_file(self, manifest_label, resource_id, path) -> None:
+        file = open(path, "wb")
+        self.resource_to_stream(manifest_label, resource_id, file)
 
 # Implements a C2paStream given a stream handle
 class C2paStream(c2pa.Stream):
@@ -51,14 +75,33 @@ class C2paStream(c2pa.Stream):
     def open_file(path: str, mode: str) -> c2pa.Stream:
         return C2paStream(open(path, mode))
 
-class LocalSigner(c2pa.SignerCallback):
 
-    def __init__(self, config, private_key):
-        self.config = config
+class SignerCallback(c2pa.SignerCallback):
+    def __init__(self, private_key):
         self.private_key = private_key
 
     def sign(self, data: bytes) -> bytes:
         return c2pa.local_sign(data, self.private_key)
+
+class LocalSigner:
+
+    def __init__(self, config, private_key):
+        callback = SignerCallback(private_key)
+        self.signer = c2pa.C2paSigner(callback)
+        self.signer.configure(config)
+
+    def signer(self):
+        return self.signer
+    
+    def from_files(alg, certs_path, private_key_path):
+        certs = open(certs_path,"rb").read()
+        config = c2pa.SignerConfig(alg, certs, "http://timestamp.digicert.com")
+        private_key = open(private_key_path,"rb").read()
+        return LocalSigner(config, private_key)
+
+class ManifestBuilder(c2pa.ManifestBuilder):
+    def __init__(self, settings):
+        super().__init__(settings)
 
 class Manifest:
     def __init__(self, title, format, claim_generator, thumbnail, ingredients, assertions, sig_info=None):

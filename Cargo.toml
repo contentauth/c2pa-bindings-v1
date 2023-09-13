@@ -20,7 +20,8 @@ serde_json = "1.0"
 serde_with = "2.0.1"
 thiserror = "1.0"
 uniffi = "0.24.3"
-openssl = "0.10.57"
+openssl = { version = "0.10.48", features = ["vendored"] }
+openssl-sys = { version = "=0.9.92"}
 pem = "3.0.2"
 
 [build-dependencies]

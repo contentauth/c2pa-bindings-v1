@@ -6,28 +6,17 @@ use crate::stream::StreamResult;
 
 #[repr(C)]
 pub struct SignerConfig {
-    /// Returns a new byte array which is a signature over the original.
-    //callback:  Box<dyn SignerCallback>,
-
     /// Returns the algorithm of the Signer.
     pub alg: String,
 
     /// Returns the certificates as a Vec containing a Vec of DER bytes for each certificate.
     pub certs: Vec<u8>,
 
-    /// Returns the size in bytes of the largest possible expected signature.
-    /// Signing will fail if the result of the `sign` function is larger
-    /// than this value.
-    pub reserve_size: u64,
-
     /// URL for time authority to time stamp the signature
     pub time_authority_url: Option<String>,
 
-    /// OCSP response for the signing cert if available
-    /// This is the only C2PA supported cert revocation method.
-    /// By pre-querying the value for a your signing cert the value can
-    /// be cached taking pressure off of the CA (recommended by C2PA spec)
-    pub ocsp_val: Option<Vec<u8>>,
+    /// Try to fetch OCSP response for the signing cert if available
+    pub use_ocsp: bool,
 }
 
 struct SignerInternalConfig {
@@ -60,7 +49,7 @@ impl C2paSigner {
         Self {
             callback,
             settings: RwLock::new(SignerInternalConfig {
-                alg: c2pa::SigningAlg::Es256,
+                alg: c2pa::SigningAlg::Ps256,
                 certs: Vec::new(),
                 reserve_size: 1024,
                 time_authority_url: None,
@@ -69,6 +58,19 @@ impl C2paSigner {
         }
     }
 
+    // fn certs(pem_certs: &[u8]) -> Result<Vec<Vec<u8>>> {
+    //     let signcerts = openssl::x509::X509::stack_from_pem(pem_certs)
+    //         .map_err(|e| C2paError::Sdk(c2pa::Error::OpenSslError(e)))?;
+    //     let mut certs: Vec<Vec<u8>> = Vec::new();
+    //     for c in signcerts {
+    //         let cert = c
+    //             .to_der()
+    //             .map_err(|e| C2paError::Sdk(c2pa::Error::OpenSslError(e)))?;
+    //         certs.push(cert);
+    //     }
+    //     Ok(certs)
+    // }
+
     pub fn configure(&self, config: &SignerConfig) -> Result<()> {
         if let Ok(mut settings) = RwLock::write(&self.settings) {
             settings.alg = c2pa::SigningAlg::from_str(&config.alg)
@@ -76,15 +78,13 @@ impl C2paSigner {
             let mut pems =
                 pem::parse_many(&config.certs).map_err(|e| C2paError::Other(e.to_string()))?;
             settings.certs = pems.drain(..).map(|p| p.into_contents()).collect();
-            settings.reserve_size = config.reserve_size
-                + config.certs.len() as u64
-                + config
-                    .time_authority_url
-                    .as_ref()
-                    .map(|u| u.len())
-                    .unwrap_or(0) as u64;
+
+            //settings.certs = Self::certs(&config.certs).expect("Failed to parse certs"  );
+            //println!("certs = {:?}", settings.certs);
+            settings.reserve_size = config.certs.len() as u64 + 20000; /* todo: call out to TSA to get actual timestamp and use that size */
+
             settings.time_authority_url = config.time_authority_url.clone();
-            settings.ocsp_val = config.ocsp_val.clone();
+            settings.ocsp_val = None;
         } else {
             return Err(C2paError::Other("RwLock".to_string()));
         }

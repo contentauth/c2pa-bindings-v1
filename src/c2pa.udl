@@ -69,7 +69,7 @@ interface ManifestBuilder {
   void from_json([ByRef] string json);
 
   [Throws=C2paError]
-  void sign_stream(Stream input, Stream? output);
+  void sign_stream([ByRef] C2paSigner signer, Stream input, Stream? output);
 };
 
 dictionary SignerConfig {
@@ -77,11 +77,9 @@ dictionary SignerConfig {
 
   bytes certs;
 
-  u64 reserve_size;
-
   string? time_authority_url = null;
 
-  bytes? ocsp_val = null;
+  boolean use_ocsp = false;
 };
 
 callback interface SignerCallback {

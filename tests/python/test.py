@@ -22,36 +22,48 @@ sys.path.append(SOURCE_PATH)
 
 import c2pa_api
 
+# paths to our certs
+pemFile = os.path.join(PROJECT_PATH,"tests","fixtures","ps256.pub")
+keyFile = os.path.join(PROJECT_PATH,"tests","fixtures","ps256.pem")
+# path to a file that already has a manifest store for reading
 testFile = os.path.join(PROJECT_PATH,"tests","fixtures","C.jpg")
-file = open(testFile, "rb") 
-stream = c2pa_api.C2paStream(file)
-manifestStore = c2pa_api.ManifestStoreReader()
-report = manifestStore.read_stream("image/jpeg",stream)
-print(report)
 
-manifest_store = c2pa_api.ManifestStore.from_json(report)
+# Output files (ensure they do not exist)
+outFile = os.path.join(PROJECT_PATH,"target","python_out.jpg")
+if os.path.exists(outFile):
+    os.remove(outFile)
+thumb_file = os.path.join(PROJECT_PATH,"target","thumb_from_python.jpg")
+if os.path.exists(thumb_file):
+    os.remove(thumb_file)
 
-manifest_label = manifest_store.activeManifest
-print(manifest_label)
-if manifest_label: 
-    manifest = manifest_store.manifests[manifest_label]
-    thumb_id = manifest.thumbnail["identifier"]
-    thumb = manifestStore.resource(manifest_label, thumb_id)
-    print(len(thumb))
+
+# example of reading a manifest store from a file
+try:
+    reader = c2pa_api.ManifestStoreReader.from_file(testFile)
+    jsonReport = reader.read()
+    print(jsonReport)
+except Exception as e:
+    print("Failed to read manifest store: " + str(e))
+    exit(1)
+
+
+try:
+    # now if we want to read a resource such as a thumbnail from the manifest store
+    # we need to find the id of the resource we want to read
+    report = json.loads(jsonReport)
+    manifest_label = report["active_manifest"]
+    manifest = report["manifests"][manifest_label]
+    thumb_id = manifest["thumbnail"]["identifier"]
     # now write the thumbnail to a file
-    thumb_file = os.path.join(PROJECT_PATH,"target","thumb_from_python.jpg")
-    if os.path.exists(thumb_file):
-        os.remove(thumb_file)
-    #if not os.path.exists(os.path.dirname(thumb_file)):
-    #    os.makedirs(os.path.dirname(thumb_file))
-    thumbOut = c2pa_api.C2paStream.open_file(thumb_file, "wb")
-    manifestStore.resource_write(manifest_label, thumb_id, thumbOut)
-    if not os.path.exists(thumb_file):
-        print("Failed to write thumbnail")
-    else:
-        print("Thumbnail written to " + thumb_file)
+    reader.resource_to_file(manifest_label, thumb_id, thumb_file)
+except Exception as e:
+    print("Failed to write thumbnail: " + str(e))
+    exit(1)
 
-manifest = {
+print("Thumbnail written to " + thumb_file)
+
+# Define a manifest as a dictionary
+manifestJson = {
     "claim_generator": "python_test",
     "claim_generator_info": [{
         "name": "python_test",
@@ -75,35 +87,19 @@ manifest = {
     ]
  }
 
-#stream.seek_stream(0,c2pa_api.c2pa.SeekMode.Begin)
-testFile = os.path.join(PROJECT_PATH,"tests","fixtures","C.jpg")
-file = open(testFile, "rb") 
-stream = c2pa_api.C2paStream(file)
-settings = c2pa_api.c2pa.ManifestBuilderSettings("foo") #{ 'generator': "foo" }
-manifest_builder = c2pa_api.c2pa.ManifestBuilder(settings)
-manifest_builder.from_json(json.dumps(manifest))
-outFile = os.path.join(PROJECT_PATH,"target","python_out.jpg")
-file = open(outFile, "wb") 
-output = c2pa_api.C2paStream(file)
-manifest_builder.sign_stream(stream, output)
+localSigner = c2pa_api.LocalSigner.from_files("ps256", pemFile, keyFile)
+signer = localSigner.signer
+# Example of signing a manifest store into a file
+try:
+    settings = c2pa_api.c2pa.ManifestBuilderSettings("foo") #{ 'generator': "foo" }
+    manifest_builder = c2pa_api.c2pa.ManifestBuilder(settings)
+    manifest_builder.from_json(json.dumps(manifestJson))
+    input = c2pa_api.C2paStream.open_file(testFile, "rb")
+    output = c2pa_api.C2paStream.open_file(outFile, "wb")
+    manifest_builder.sign_stream(signer, input, output)
+except Exception as e:
+    print("Failed to sign manifest store: " + str(e))
+    exit(1)
 
-
-pemFile = os.path.join(PROJECT_PATH,"tests","fixtures","temp_cert.data")
-keyFile = os.path.join(PROJECT_PATH,"tests","fixtures","temp_priv_key.data")
-
-with open(pemFile,"rb") as f:
-    certs = bytearray(f.read())
-
-with open(keyFile,"rb") as f:
-    private_key = bytearray(f.read())
-
-
-signerConfig = c2pa_api.c2pa.SignerConfig("ps256", certs, 1000 , "http://timestamp.digicert.com")
-
-signer = c2pa_api.LocalSigner(signerConfig, private_key)
-
-file = open(testFile, "rb") 
-bytes = bytearray(file.read())
-signature = signer.sign(bytes)
-
-print(signature)
+print("manifest store written to " + outFile)
+print(c2pa_api.ManifestStoreReader.from_file(outFile).read())
