@@ -87,16 +87,18 @@ manifestJson = {
     ]
  }
 
-localSigner = c2pa_api.LocalSigner.from_files("ps256", pemFile, keyFile)
-signer = localSigner.signer
+# Create a local signer from a certificate pem file
+signer = c2pa_api.LocalSigner.from_settings("ps256", pemFile, "http://timestamp.digicert.com")
+
 # Example of signing a manifest store into a file
 try:
-    settings = c2pa_api.c2pa.ManifestBuilderSettings("foo") #{ 'generator': "foo" }
-    manifest_builder = c2pa_api.c2pa.ManifestBuilder(settings)
-    manifest_builder.from_json(json.dumps(manifestJson))
-    input = c2pa_api.C2paStream.open_file(testFile, "rb")
-    output = c2pa_api.C2paStream.open_file(outFile, "wb")
-    manifest_builder.sign_stream(signer, input, output)
+    settings = c2pa_api.c2pa.ManifestBuilderSettings("python-generator") 
+    c2pa_api.ManifestBuilder.sign_with_files(settings, signer, manifestJson, testFile, outFile) 
+    #manifest_builder = c2pa_api.c2pa.ManifestBuilder(settings)
+    #manifest_builder.from_json(json.dumps(manifestJson))
+    #input = c2pa_api.C2paStream.open_file(testFile, "rb")
+    #output = c2pa_api.C2paStream.open_file(outFile, "wb")
+    #manifest_builder.sign_stream(localSigner.signer, input, output)
 except Exception as e:
     print("Failed to sign manifest store: " + str(e))
     exit(1)

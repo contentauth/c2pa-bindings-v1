@@ -33,9 +33,9 @@ pub use stream::{SeekMode, Stream, StreamAdapter, StreamError, StreamResult};
 #[cfg(test)]
 mod test_stream;
 
-//#[cfg(test)]
+#[cfg(test)]
 mod test_signer;
-pub use test_signer::local_sign;
+//pub use test_signer::local_sign;
 
 uniffi::include_scaffolding!("c2pa");
 

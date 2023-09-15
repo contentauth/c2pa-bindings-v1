@@ -2,9 +2,6 @@
 namespace c2pa {
   string version();
   sequence<string> supported_extensions();
-
-  [Throws=C2paError]
-  bytes local_sign([ByRef] bytes data, [ByRef] bytes pkey);
 };
 
 [Error]

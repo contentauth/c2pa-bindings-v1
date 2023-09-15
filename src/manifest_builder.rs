@@ -97,6 +97,28 @@ impl ManifestBuilder {
             Err(C2paError::RwLock)
         }
     }
+
+    pub fn sign_cai_read(
+        &self,
+        signer: &dyn c2pa::Signer,
+        input: &mut dyn c2pa::CAIRead,
+        output: Option<impl Read + Write + Seek>,
+        //_c2pa_data: Option<impl Write>,
+    ) -> Result<()> {
+        if let Ok(mut manifest) = self.manifest.try_write() {
+            let format = manifest.format().to_string();
+            //println!("format: {}", format );
+            let result = manifest
+                .embed_stream(&format, input, signer)
+                .map_err(C2paError::Sdk)?;
+            if let Some(mut output) = output {
+                output.write_all(&result).map_err(C2paError::Io)?;
+            };
+            Ok(())
+        } else {
+            Err(C2paError::RwLock)
+        }
+    }
 }
 
 #[cfg(test)]

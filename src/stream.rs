@@ -20,10 +20,11 @@ use crate::error::C2paError;
 pub type StreamResult<T> = std::result::Result<T, StreamError>;
 
 #[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SeekMode {
-    Start,
-    End,
-    Current,
+    Start = 0,
+    End = 1,
+    Current = 2,
 }
 
 #[derive(Error, Debug)]

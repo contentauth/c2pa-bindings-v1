@@ -77,32 +77,42 @@ class C2paStream(c2pa.Stream):
 
 
 class SignerCallback(c2pa.SignerCallback):
-    def __init__(self, private_key):
-        self.private_key = private_key
+    def __init__(self):
+        pass
 
     def sign(self, data: bytes) -> bytes:
-        return c2pa.local_sign(data, self.private_key)
+        open("data.bin", "wb").write(data)
+        os.system("openssl dgst -sha256 -sign tests/fixtures/ps256.pem -out signature.sig data.bin")
+        return open("signature.sig", "rb").read()
 
 class LocalSigner:
 
-    def __init__(self, config, private_key):
-        callback = SignerCallback(private_key)
+    def __init__(self, config):
+        callback = SignerCallback()
         self.signer = c2pa.C2paSigner(callback)
         self.signer.configure(config)
 
     def signer(self):
         return self.signer
     
-    def from_files(alg, certs_path, private_key_path):
+    def from_settings(alg, certs_path, timestamp_url=None):
         certs = open(certs_path,"rb").read()
-        config = c2pa.SignerConfig(alg, certs, "http://timestamp.digicert.com")
-        private_key = open(private_key_path,"rb").read()
-        return LocalSigner(config, private_key)
+        config = c2pa.SignerConfig(alg, certs, timestamp_url)
+        return LocalSigner(config).signer
 
 class ManifestBuilder(c2pa.ManifestBuilder):
     def __init__(self, settings):
         super().__init__(settings)
 
+    def sign_with_files(settings, signer, manifestJson, sourcePath, outputPath):
+        builder = c2pa.ManifestBuilder(settings)
+        builder.from_json(json.dumps(manifestJson))
+        input = C2paStream.open_file(sourcePath, "rb")
+        output = C2paStream.open_file(outputPath, "wb")
+        builder.sign_stream(signer, input, output)
+        return builder
+
+ 
 class Manifest:
     def __init__(self, title, format, claim_generator, thumbnail, ingredients, assertions, sig_info=None):
         self.title = title
@@ -112,6 +122,8 @@ class Manifest:
         self.ingredients = ingredients
         self.assertions = assertions
         self.signature_info = sig_info
+
+    
 
 class ManifestStore:
     def __init__(self, activeManifest, manifests, validationStatus=None):
