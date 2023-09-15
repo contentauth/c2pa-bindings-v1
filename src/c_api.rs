@@ -16,7 +16,10 @@ use std::{
     io::{Read, Seek, SeekFrom, Write},
 };
 
-use crate::{C2paError, C2paSigner, ManifestStoreReader, ManifestBuilder, ManifestBuilderSettings, SignerConfig, SeekMode};
+use crate::{
+    C2paError, C2paSigner, ManifestBuilder, ManifestBuilderSettings, ManifestStoreReader, SeekMode,
+    SignerConfig,
+};
 
 /// Defines a callback to read from a stream
 type ReadCallback =
@@ -31,8 +34,12 @@ type WriteCallback =
     unsafe extern "C" fn(context: *const StreamContext, data: *const u8, len: usize) -> isize;
 
 /// Defines a callback to sign data
-type SignerCallback =
-    unsafe extern "C" fn(data: *mut u8, len: usize, signature: *mut u8, sig_max_size: isize) -> isize;
+type SignerCallback = unsafe extern "C" fn(
+    data: *mut u8,
+    len: usize,
+    signature: *mut u8,
+    sig_max_size: isize,
+) -> isize;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -107,7 +114,7 @@ impl _C2paConfigC {
 /// A C2paSignerCallback defines a signer in C to be called from Rust
 #[derive(Debug)]
 struct CSignerCallback {
-    signer: SignerCallback
+    signer: SignerCallback,
 }
 
 impl crate::SignerCallback for CSignerCallback {
@@ -118,10 +125,19 @@ impl crate::SignerCallback for CSignerCallback {
         //let mut signature: *mut u8 = std::ptr::null_mut();
         // This callback returns the size of the signature, if negative it means there was an error
         let sig: *mut u8 = signature.as_ptr() as *mut u8;
-        let result = unsafe { (self.signer)(data.as_ptr() as *mut u8, data.len(), sig, sig_max_size as isize) };
+        let result = unsafe {
+            (self.signer)(
+                data.as_ptr() as *mut u8,
+                data.len(),
+                sig,
+                sig_max_size as isize,
+            )
+        };
         if result < 0 {
             // todo: return errors from callback
-            return Err(crate::StreamError::Other{reason:"signer error".to_string()});
+            return Err(crate::StreamError::Other {
+                reason: "signer error".to_string(),
+            });
         }
         signature.truncate(result as usize);
         //println!("SignerCallback signing result {}", signature.len());
@@ -133,7 +149,7 @@ impl crate::SignerCallback for CSignerCallback {
 #[no_mangle]
 pub unsafe extern "C" fn c2pa_create_signer(
     signer: SignerCallback,
-    config: &SignerConfigC
+    config: &SignerConfigC,
 ) -> *mut C2paSigner {
     let config = SignerConfig {
         alg: from_c_str(config.alg).to_lowercase(),
@@ -147,7 +163,7 @@ pub unsafe extern "C" fn c2pa_create_signer(
     };
     let callback = Box::new(CSignerCallback { signer });
     let signer = C2paSigner::new(callback);
-    match signer.configure(&config){
+    match signer.configure(&config) {
         Ok(_) => Box::into_raw(Box::new(signer)),
         Err(e) => {
             e.set_last();
@@ -155,7 +171,6 @@ pub unsafe extern "C" fn c2pa_create_signer(
         }
     }
 }
-
 
 #[repr(C)]
 /// A C2paStream is a Rust Read/Write/Seek stream that can be used in C
@@ -273,7 +288,7 @@ impl c2pa::CAIReadWrite for C2paStream {}
 //         };
 //         let new_pos = self.seek(whence)?;
 //         Ok(new_pos)
-//     }   
+//     }
 // }
 
 // impl Into<Box<dyn Stream>> for C2paStream {
@@ -281,7 +296,6 @@ impl c2pa::CAIReadWrite for C2paStream {}
 //         Box::new(StreamAdapter::from_stream(Box::new(self)))
 //     }
 // }
-
 
 /// Creates a new C2paStream from context with callbacks
 ///
@@ -480,13 +494,12 @@ pub unsafe extern "C" fn c2pa_manifest_reader_resource(
     *reader_ptr = Box::into_raw(reader);
 }
 
-
 /// Create a ManifestBuilder
-/// 
+///
 /// # Arguments
 /// * `settings` - a pointer to a ManifestBuilderSettingsC
 /// * `json` - a pointer to a null terminated JSON Manifest Definition
-/// 
+///
 /// # Returns
 /// * `Result<*mut ManifestBuilder>` - a pointer to a ManifestBuilder
 ///
@@ -508,12 +521,12 @@ pub unsafe extern "C" fn c2pa_manifest_reader_resource(
 ///   let builder = ManifestBuilder::new(&settings);
 ///    builder.from_json(json);
 /// ```
-/// 
+///
 
 #[no_mangle]
 pub unsafe extern "C" fn c2pa_create_manifest_builder(
-        settings: &ManifestBuilderSettingsC,
-        json: *const c_char,
+    settings: &ManifestBuilderSettingsC,
+    json: *const c_char,
 ) -> *mut ManifestBuilder {
     let json = from_c_str(json);
     let settings = ManifestBuilderSettings {
@@ -525,26 +538,26 @@ pub unsafe extern "C" fn c2pa_create_manifest_builder(
         Ok(_) => Box::into_raw(Box::new(builder)),
         Err(e) => {
             e.set_last();
-            return std::ptr::null_mut();
+            std::ptr::null_mut()
         }
     }
 }
 
 #[no_mangle]
 /// Sign using a ManifestBuilder
-/// 
+///
 /// # Arguments
 /// * `builder` - a pointer to a ManifestBuilder
 /// * `signer` - a pointer to a C2paSigner
 /// * `input` - a pointer to a C2paStream
 /// * `output` - optional pointer to a C2paStream
-/// 
+///
 pub unsafe extern "C" fn c2pa_manifest_builder_sign(
     builder_ptr: *mut *mut ManifestBuilder,
     signer: *mut C2paSigner,
     input: *mut C2paStream,
     output: *mut C2paStream,
-    ) -> c_int {
+) -> c_int {
     let builder = Box::from_raw(*builder_ptr);
     let signer = Box::from_raw(signer);
     let mut input = Box::from_raw(input);
@@ -554,7 +567,7 @@ pub unsafe extern "C" fn c2pa_manifest_builder_sign(
     };
     //println!("c2pa_manifest_builder_sign input {:p}, context {:p}", &(*input), input.context);
     input.seek(SeekFrom::Start(0)).unwrap();
-    let result = builder.sign_cai_read(&(*signer), &mut (*input), output);  
+    let result = builder.sign_cai_read(&(*signer), &mut (*input), output);
     *builder_ptr = Box::into_raw(builder);
     Box::into_raw(signer);
     Box::into_raw(input);
@@ -562,11 +575,10 @@ pub unsafe extern "C" fn c2pa_manifest_builder_sign(
         Ok(_) => 0,
         Err(e) => {
             e.set_last();
-            return -1;
+            -1
         }
     }
 }
-
 
 /// Releases a string allocated by Rust
 ///

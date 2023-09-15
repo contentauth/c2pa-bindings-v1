@@ -77,36 +77,51 @@ class C2paStream(c2pa.Stream):
 
 
 class SignerCallback(c2pa.SignerCallback):
-    def __init__(self):
-        pass
+    def __init__(self,callback):
+        self.sign = callback
+        super().__init__()
 
-    def sign(self, data: bytes) -> bytes:
-        open("data.bin", "wb").write(data)
-        os.system("openssl dgst -sha256 -sign tests/fixtures/ps256.pem -out signature.sig data.bin")
-        return open("signature.sig", "rb").read()
+    #def sign(self, data: bytes) -> bytes:
+    #    open("data.bin", "wb").write(data)
+    #   os.system("openssl dgst -sha256 -sign tests/fixtures/ps256.pem -out signature.sig data.bin")
+    #    return open("signature.sig", "rb").read()
+
+def sign(data: bytes) -> bytes:
+    open("data.bin", "wb").write(data)
+    os.system("openssl dgst -sha256 -sign tests/fixtures/ps256.pem -out signature.sig data.bin")
+    return open("signature.sig", "rb").read()
 
 class LocalSigner:
 
-    def __init__(self, config):
-        callback = SignerCallback()
+    def __init__(self, config, sign_callback):
+        callback = SignerCallback(sign_callback)
         self.signer = c2pa.C2paSigner(callback)
         self.signer.configure(config)
 
     def signer(self):
         return self.signer
     
-    def from_settings(alg, certs_path, timestamp_url=None):
-        certs = open(certs_path,"rb").read()
+    def from_settings(sign_callback, alg, certs, timestamp_url=None):
         config = c2pa.SignerConfig(alg, certs, timestamp_url)
-        return LocalSigner(config).signer
+        return LocalSigner(config, sign_callback).signer
 
 class ManifestBuilder(c2pa.ManifestBuilder):
-    def __init__(self, settings):
+    def __init__(self, settings, signer, manifest = None):
+        self.signer = signer
         super().__init__(settings)
+        if manifest is not None:
+            self.from_json(json.dumps(manifest))
+
+    def set_manifest(self, manifest):
+        self.from_json(json.dumps(manifest))
+        return self
+    
+    def sign(self, input, output=None):
+        self.sign_stream(self.signer, input, output)
+        return self.signer
 
     def sign_with_files(settings, signer, manifestJson, sourcePath, outputPath):
-        builder = c2pa.ManifestBuilder(settings)
-        builder.from_json(json.dumps(manifestJson))
+        builder = ManifestBuilder(settings, signer, manifestJson)
         input = C2paStream.open_file(sourcePath, "rb")
         output = C2paStream.open_file(outputPath, "wb")
         builder.sign_stream(signer, input, output)

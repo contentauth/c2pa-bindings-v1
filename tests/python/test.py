@@ -63,13 +63,14 @@ except Exception as e:
 print("Thumbnail written to " + thumb_file)
 
 # Define a manifest as a dictionary
-manifestJson = {
+manifestDefinition = {
     "claim_generator": "python_test",
     "claim_generator_info": [{
         "name": "python_test",
         "version": "0.0.1",
     }],
     "format": "image/jpeg",
+    "title": "Python Test Image",
     "ingredients": [],
     "assertions": [
         {   'label': 'stds.schema-org.CreativeWork',
@@ -87,18 +88,27 @@ manifestJson = {
     ]
  }
 
+# Define a function that will sign the data using openssl
+# and return the signature as a byte array
+def sign_ps256(data: bytes) -> bytes:
+    open("target/data.bin", "wb").write(data)
+    os.system("openssl dgst -sha256 -sign tests/fixtures/ps256.pem -out target/signature.sig target/data.bin")
+    return open("target/signature.sig", "rb").read()
+
+# load the public keys from a pem file
+pemFile = os.path.join(PROJECT_PATH,"tests","fixtures","ps256.pub")
+certs = open(pemFile,"rb").read()
+
 # Create a local signer from a certificate pem file
-signer = c2pa_api.LocalSigner.from_settings("ps256", pemFile, "http://timestamp.digicert.com")
+signer = c2pa_api.LocalSigner.from_settings(sign_ps256, "ps256", certs, "http://timestamp.digicert.com")
 
 # Example of signing a manifest store into a file
 try:
     settings = c2pa_api.c2pa.ManifestBuilderSettings("python-generator") 
-    c2pa_api.ManifestBuilder.sign_with_files(settings, signer, manifestJson, testFile, outFile) 
-    #manifest_builder = c2pa_api.c2pa.ManifestBuilder(settings)
-    #manifest_builder.from_json(json.dumps(manifestJson))
-    #input = c2pa_api.C2paStream.open_file(testFile, "rb")
-    #output = c2pa_api.C2paStream.open_file(outFile, "wb")
-    #manifest_builder.sign_stream(localSigner.signer, input, output)
+    c2pa_api.ManifestBuilder.sign_with_files(settings, signer, manifestDefinition, testFile, outFile)
+    #builder = c2pa_api.ManifestBuilder(settings, signer, manifestDefinition)
+    #c2pa_api.ManifestBuilder.sign(testFile, outFile) 
+
 except Exception as e:
     print("Failed to sign manifest store: " + str(e))
     exit(1)
