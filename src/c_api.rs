@@ -614,12 +614,15 @@ pub unsafe extern "C" fn c2pa_release_manifest_reader(reader: *mut ManifestStore
 /// can only be released once and is invalid after this call
 #[no_mangle]
 pub unsafe extern "C" fn c2pa_release_manifest_builder(builder: *mut ManifestBuilder) {
-    c2pa_release_box(builder as *mut std::ffi::c_void);
-}
-
-pub unsafe extern "C" fn c2pa_release_box(object: *mut std::ffi::c_void) {
-    if object.is_null() {
+    if builder.is_null() {
         return;
     }
-    drop(Box::from_raw(object));
+    drop(Box::from_raw(builder));
 }
+
+// pub unsafe extern "C" fn c2pa_release_box(object: *mut std::ffi::c_void) {
+//     if object.is_null() {
+//         return;
+//     }
+//     drop(Box::from_raw(object));
+// }

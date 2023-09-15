@@ -22,6 +22,7 @@ const char * asset_path = "tests/fixtures/A.jpg";
 
 const char* manifest_json = "{\
     \"claim_generator\":\"c-test\",\
+    \"title\":\"C Test Image\",\
     \"format\":\"image/jpeg\",\
     \"ingredients\":[], \
     \"assertions\":[] \
@@ -117,13 +118,16 @@ intptr_t signer_callback(uint8_t *data, uintptr_t len, uint8_t *signature, uintp
     uint64_t data_len= (uint64_t) len;
     //printf("sign: data = %p, len = %ld\n", data, data_len);
     // write data to be signed to a temp file
-    int result = save_file("claim_data.bin", data, data_len);
-
+    int result = save_file("target/c_data.bin", data, data_len);
+    if (result < 0) {
+        printf("signing failed");
+        return -1;
+    }
     // sign the temp file by calling openssl in a shell
-    system("openssl dgst -sign tests/fixtures/ps256.pem -sha256 -out signature.sig claim_data.bin");
+    system("openssl dgst -sign tests/fixtures/ps256.pem -sha256 -out target/c_signature.sig target/c_data.bin");
 
     // read the signature file
-    FILE* result_file = fopen("signature.sig", "rb");
+    FILE* result_file = fopen("target/c_signature.sig", "rb");
     if (result_file == NULL) {
         printf("signing failed");
         return -1;
@@ -286,7 +290,7 @@ int main(void) {
         printf("error creating input stream = %s\n", c2pa_error());
         return 1;
     }
-    C2paStream* output_stream = open_file_stream("target/output_c.jpg", "wb");
+    C2paStream* output_stream = open_file_stream("target/c_output.jpg", "wb");
     if (output_stream == NULL) {
         printf("error creating output stream = %s\n", c2pa_error());
         return 1;
@@ -300,5 +304,5 @@ int main(void) {
     close_file_stream(input_stream2);
     close_file_stream(output_stream);
     c2pa_release_manifest_builder(builder);
-    printf("manifest added to: %s\n", "target/output_c.jpg" );
+    printf("manifest added to: %s\n", "target/c_output.jpg" );
 }
