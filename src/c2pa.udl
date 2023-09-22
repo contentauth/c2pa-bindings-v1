@@ -52,7 +52,7 @@ interface ManifestStoreReader {
   bytes resource([ByRef] string manifest, [ByRef] string id);
 
   [Throws=StreamError]
-  void resource_write([ByRef] string manifest, [ByRef] string id, Stream stream);
+  void resource_write([ByRef] string manifest, [ByRef] string id, [ByRef] Stream stream);
 };
 
 dictionary ManifestBuilderSettings {

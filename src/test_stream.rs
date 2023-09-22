@@ -33,6 +33,14 @@ impl TestStream {
             stream: RwLock::new(Cursor::new(data)),
         }
     }
+
+    pub fn _data(&self) -> Vec<u8> {
+        if let Ok(stream) = RwLock::read(&self.stream) {
+            stream.get_ref().clone()
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 impl Stream for TestStream {

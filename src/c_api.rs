@@ -208,6 +208,23 @@ impl C2paStream {
     }
 }
 
+impl crate::Stream for C2paStream {
+    fn read_stream(&self, len: u64) -> crate::StreamResult<Vec<u8>> {
+        let mut buf = vec![0; len as usize];
+        let bytes_read = unsafe { (self.read_callback)(&(*self.context), buf.as_mut_ptr(), buf.len()) };
+        buf.truncate(bytes_read as usize);
+        Ok(buf)
+    }
+    fn seek_stream(&self, pos: i64, mode: SeekMode) -> crate::StreamResult<u64> {
+        let new_pos = unsafe { (self.seek_callback)(&(*self.context), pos as c_long, mode) };
+        Ok(new_pos as u64)
+    }
+    fn write_stream(&self, data: Vec<u8>) -> crate::StreamResult<u64> {
+        let bytes_written = unsafe { (self.write_callback)(&(*self.context), data.as_ptr(), data.len()) };
+        Ok(bytes_written as u64)
+    }
+}
+
 impl Read for C2paStream {
     // implements Rust Read trait by calling back to the C read callback
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
@@ -264,6 +281,17 @@ impl c2pa::CAIRead for C2paStream {}
 
 impl c2pa::CAIReadWrite for C2paStream {}
 
+impl Into<Box<dyn c2pa::CAIRead>> for C2paStream {
+    fn into(self) -> Box<dyn c2pa::CAIRead> {
+        Box::new(self)
+    }
+}
+
+impl Into<Box<dyn crate::Stream>> for C2paStream {
+    fn into(self) -> Box<dyn crate::Stream> {
+        Box::new(self)
+    }
+}
 // impl Stream for C2paStream {
 //     fn read_stream(&self, len: u64) -> crate::StreamResult<Vec<u8>> {
 //         self.read_callback(&*self.context, std::ptr::null_mut(), len as usize);
@@ -561,13 +589,16 @@ pub unsafe extern "C" fn c2pa_manifest_builder_sign(
     let builder = Box::from_raw(*builder_ptr);
     let signer = Box::from_raw(signer);
     let mut input = Box::from_raw(input);
-    let output = match output.is_null() {
+    let output_stream = match output.is_null() {
         true => None,
-        false => Some(&mut *output),
+        //false => Some(Box::from_raw(output))
+        false => Some(crate::stream::StreamAdapter::from_stream(&mut(*output))), // Some(&mut *output),
     };
-    //println!("c2pa_manifest_builder_sign input {:p}, context {:p}", &(*input), input.context);
-    input.seek(SeekFrom::Start(0)).unwrap();
-    let result = builder.sign_cai_read(&(*signer), &mut (*input), output);
+     //println!("c2pa_manifest_builder_sign input {:p}, context {:p}", &(*input), input.context);
+    //input.seek(SeekFrom::Start(0)).unwrap();
+    let mut input_stream = crate::stream::StreamAdapter::from_stream(&mut(*input));
+    let result = builder.sign_cai_read(&(*signer), &mut input_stream, output_stream);
+    //let result = builder.sign_stream(&(*signer), input, output_stream);
     *builder_ptr = Box::into_raw(builder);
     Box::into_raw(signer);
     Box::into_raw(input);
