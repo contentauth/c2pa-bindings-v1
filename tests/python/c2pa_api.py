@@ -42,7 +42,7 @@ class ManifestStoreReader(c2pa.ManifestStoreReader):
         return super().read_stream(self.format, self.stream)
     
     def resource_to_stream(self, manifest_label, resource_id, stream) -> None:
-        super().resource_write(manifest_label, resource_id, C2paStream(stream))
+        super().resource_write_stream(manifest_label, resource_id, C2paStream(stream))
 
     def resource_to_file(self, manifest_label, resource_id, path) -> None:
         file = open(path, "wb")

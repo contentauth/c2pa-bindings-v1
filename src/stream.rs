@@ -81,151 +81,21 @@ impl Stream for Box<dyn Stream> {
     }
 }
 
-impl Stream for &Box<dyn Stream> {
-    fn read_stream(&self, length: u64) -> StreamResult<Vec<u8>> {
-        (**self).read_stream(length)
-    }
-
-    fn seek_stream(&self, pos: i64, mode: SeekMode) -> StreamResult<u64> {
-        (**self).seek_stream(pos, mode)
-    }
-
-    fn write_stream(&self, data: Vec<u8>) -> StreamResult<u64> {
-        (**self).write_stream(data)
-    }
-}
-
-impl Read for &Box<dyn Stream> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let mut bytes = self
-            .read_stream(buf.len() as u64)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        let len = bytes.len();
-        buf.iter_mut().zip(bytes.drain(..)).for_each(|(dest, src)| {
-            *dest = src;
-        });
-        Ok(len)
-    }
-}
-
-impl Seek for &Box<dyn Stream> {
-    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        let (pos, mode) = match pos {
-            SeekFrom::Current(pos) => (pos, SeekMode::Current),
-            SeekFrom::Start(pos) => (pos as i64, SeekMode::Start),
-            SeekFrom::End(pos) => (pos, SeekMode::End),
-        };
-        self.seek_stream(pos, mode)
-            .map_err(|_| std::io::Error::last_os_error())
-    }
-}   
-
-impl Write for &Box<dyn Stream> {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let len = self
-            .write_stream(buf.to_vec())
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-        Ok(len as usize)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}   
-
-
-// impl Read for dyn Stream {
-//     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-//         let mut bytes = self
-//             .read_stream(buf.len() as u64)
-//             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-//         let len = bytes.len();
-//         buf.iter_mut().zip(bytes.drain(..)).for_each(|(dest, src)| {
-//             *dest = src;
-//         });
-//         Ok(len)
-//     }
-// }
-
-// impl Seek for dyn Stream {
-//     fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-//         let (pos, mode) = match pos {
-//             SeekFrom::Current(pos) => (pos, SeekMode::Current),
-//             SeekFrom::Start(pos) => (pos as i64, SeekMode::Start),
-//             SeekFrom::End(pos) => (pos, SeekMode::End),
-//         };
-//         self.seek_stream(pos, mode)
-//             .map_err(|_| std::io::Error::last_os_error())
-//     }
-// }
-
-// impl Write for dyn Stream {
-//     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-//         let len = self
-//             .write_stream(buf.to_vec())
-//             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-//         Ok(len as usize)
-//     }
-
-//     fn flush(&mut self) -> std::io::Result<()> {
-//         Ok(())
-//     }
-//}
-
-// pub struct FooBarPtr<'a>(&'a mut dyn Stream);
-
-// impl<'a> Read for FooBarPtr<'a> {
-//     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-//         let mut bytes = self
-//             .reader
-//             .read_stream(buf.len() as u64)
-//             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-//         let len = bytes.len();
-//         buf.iter_mut().zip(bytes.drain(..)).for_each(|(dest, src)| {
-//             *dest = src;
-//         });
-//         //println!("read: {:?}", len);
-//         Ok(len)
-//     }
-// }
-
-// impl<'a> Seek for FooBarPtr<'a> {
-//     fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
-//         let (pos, mode) = match pos {
-//             SeekFrom::Current(pos) => (pos, SeekMode::Current),
-//             SeekFrom::Start(pos) => (pos as i64, SeekMode::Start),
-//             SeekFrom::End(pos) => (pos, SeekMode::End),
-//         };
-//         //println!("Stream Seek {}", pos);
-//         self.reader
-//             .seek_stream(pos, mode)
-//             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-//     }
-// }
-
-// impl<'a> Write for FooBarPtr<'a> {
-//     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-//         let len = self
-//             .reader
-//             .write_stream(buf.to_vec())
-//             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-//         Ok(len as usize)
-//     }
-
-//     fn flush(&mut self) -> std::io::Result<()> {
-//         Ok(())
-//     }
-// }
-
-// impl<'a> c2pa::CAIRead for FooBarPtr<'a> {}
-
 pub struct StreamAdapter<'a> {
-    pub reader: &'a mut dyn Stream,
+    pub stream: &'a mut dyn Stream,
 }
 
 impl<'a> StreamAdapter<'a> {
-    pub fn from_stream(reader: &'a mut dyn Stream) -> Self {
-        Self { reader }
+    pub fn from_stream_mut(stream: &'a mut dyn Stream) -> Self {
+        Self { stream }
+    }
+}
+
+impl<'a> From<&'a dyn Stream> for StreamAdapter<'a> {
+    fn from(stream: &'a dyn Stream) -> Self {
+        let stream = &*stream as *const dyn Stream as *mut dyn Stream;
+        let stream = unsafe { &mut *stream };
+        Self { stream }
     }
 }
 
@@ -236,7 +106,7 @@ impl<'a> c2pa::CAIReadWrite for StreamAdapter<'a> {}
 impl<'a> Read for StreamAdapter<'a> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let mut bytes = self
-            .reader
+            .stream
             .read_stream(buf.len() as u64)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         let len = bytes.len();
@@ -256,7 +126,7 @@ impl<'a> Seek for StreamAdapter<'a> {
             SeekFrom::End(pos) => (pos, SeekMode::End),
         };
         //println!("Stream Seek {}", pos);
-        self.reader
+        self.stream
             .seek_stream(pos, mode)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
@@ -265,7 +135,7 @@ impl<'a> Seek for StreamAdapter<'a> {
 impl<'a> Write for StreamAdapter<'a> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let len = self
-            .reader
+            .stream
             .write_stream(buf.to_vec())
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         Ok(len as usize)
@@ -285,7 +155,7 @@ mod tests {
     #[test]
     fn test_stream_read() {
         let mut test = TestStream::from_memory(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-        let mut stream = StreamAdapter::from_stream(&mut test);
+        let mut stream = StreamAdapter::from_stream_mut(&mut test);
         let mut buf = [0u8; 5];
         let len = stream.read(&mut buf).unwrap();
         assert_eq!(len, 5);
@@ -295,7 +165,7 @@ mod tests {
     #[test]
     fn test_stream_seek() {
         let mut test = TestStream::from_memory(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-        let mut stream = StreamAdapter { reader: &mut test };
+        let mut stream = StreamAdapter { stream: &mut test };
         let pos = stream.seek(SeekFrom::Start(5)).unwrap();
         assert_eq!(pos, 5);
         let mut buf = [0u8; 5];
@@ -307,7 +177,7 @@ mod tests {
     #[test]
     fn test_stream_write() {
         let mut test = TestStream::new();
-        let mut stream = StreamAdapter { reader: &mut test };
+        let mut stream = StreamAdapter { stream: &mut test };
         let len = stream.write(&[0, 1, 2, 3, 4]).unwrap();
         assert_eq!(len, 5);
         stream.seek(SeekFrom::Start(0)).unwrap();

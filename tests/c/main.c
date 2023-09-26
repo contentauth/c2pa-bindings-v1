@@ -214,7 +214,7 @@ int main(void) {
         printf("manifest new err = %s\n", c2pa_error());
         return 1;
     }
-    char* result = c2pa_manifest_reader_read(&manifest_reader, "image/jpeg", *input_stream);
+    char* result = c2pa_manifest_reader_read(&manifest_reader, "image/jpeg", input_stream);
     if (result == NULL) {
         printf("manifest read err = %s\n", c2pa_error());
         return 1;

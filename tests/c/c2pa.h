@@ -120,6 +120,10 @@ typedef struct C2paStream {
   WriteCallback write_callback;
 } C2paStream;
 
+/**
+ * Configuration settings for the ManifestBuilder
+ * this is mostly a placeholder for future expansion
+ */
 typedef struct ManifestBuilderSettingsC {
   const char *claim_generator;
 } ManifestBuilderSettingsC;
@@ -131,28 +135,6 @@ extern "C" {
 IMPORT extern
 struct C2paSigner *c2pa_create_signer(SignerCallback signer,
                                       const struct SignerConfigC *config);
-
-/**
- * Creates a new C2paStream from context with callbacks
- *
- * This allows implementing streams in other languages
- *
- * # Arguments
- * * `context` - a pointer to a StreamContext
- * * `read` - a ReadCallback to read from the stream
- * * `seek` - a SeekCallback to seek in the stream
- * * `write` - a WriteCallback to write to the stream
- *
- * # Safety
- * The context must remain valid for the lifetime of the C2paStream
- * The resulting C2paStream must be released by calling c2pa_release_stream
- *
- */
-IMPORT extern
-struct C2paStream *c2pa_create_stream(struct StreamContext *context,
-                                      ReadCallback read,
-                                      SeekCallback seek,
-                                      WriteCallback write);
 
 /**
  * Returns the last error message
@@ -182,6 +164,28 @@ IMPORT extern char *c2pa_version(void);
 IMPORT extern char *c2pa_supported_extensions(void);
 
 /**
+ * Creates a new C2paStream from context with callbacks
+ *
+ * This allows implementing streams in other languages
+ *
+ * # Arguments
+ * * `context` - a pointer to a StreamContext
+ * * `read` - a ReadCallback to read from the stream
+ * * `seek` - a SeekCallback to seek in the stream
+ * * `write` - a WriteCallback to write to the stream
+ *
+ * # Safety
+ * The context must remain valid for the lifetime of the C2paStream
+ * The resulting C2paStream must be released by calling c2pa_release_stream
+ *
+ */
+IMPORT extern
+struct C2paStream *c2pa_create_stream(struct StreamContext *context,
+                                      ReadCallback read,
+                                      SeekCallback seek,
+                                      WriteCallback write);
+
+/**
  * Verify a stream and return a ManifestStore report
  *
  * # Errors
@@ -191,7 +195,7 @@ IMPORT extern char *c2pa_supported_extensions(void);
  * The returned value MUST be released by calling release_string
  * and it is no longer valid after that call.
  */
-IMPORT extern char *c2pa_verify_stream(struct C2paStream reader);
+IMPORT extern char *c2pa_verify_stream(struct C2paStream *reader);
 
 /**
  * Create a new ManifestStoreReader
@@ -237,7 +241,7 @@ IMPORT extern struct ManifestStoreReader *c2pa_manifest_reader_new(void);
 IMPORT extern
 char *c2pa_manifest_reader_read(struct ManifestStoreReader **reader_ptr,
                                 const char *format,
-                                struct C2paStream stream);
+                                struct C2paStream *stream);
 
 /**
  * Writes a resource from the manifest reader to a stream
@@ -317,7 +321,7 @@ struct ManifestBuilder *c2pa_create_manifest_builder(const struct ManifestBuilde
  */
 IMPORT extern
 int c2pa_manifest_builder_sign(struct ManifestBuilder **builder_ptr,
-                               struct C2paSigner *signer,
+                               const struct C2paSigner *signer,
                                struct C2paStream *input,
                                struct C2paStream *output);
 

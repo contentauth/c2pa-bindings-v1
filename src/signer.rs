@@ -1,9 +1,23 @@
+// Copyright 2023 Adobe. All rights reserved.
+// This file is licensed to you under the Apache License,
+// Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+// or the MIT license (http://opensource.org/licenses/MIT),
+// at your option.
+
+// Unless required by applicable law or agreed to in writing,
+// this software is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR REPRESENTATIONS OF ANY KIND, either express or
+// implied. See the LICENSE-MIT and LICENSE-APACHE files for the
+// specific language governing permissions and limitations under
+// each license.
+
 use std::str::FromStr;
 use std::sync::RwLock;
 
 use crate::error::{C2paError, Result};
 use crate::stream::StreamResult;
 
+/// Configuration for a Signer
 #[repr(C)]
 pub struct SignerConfig {
     /// Returns the algorithm of the Signer.
@@ -19,6 +33,8 @@ pub struct SignerConfig {
     pub use_ocsp: bool,
 }
 
+/// Internal configuration for a Signer
+/// This is what is actually stored, as generated from the public SignerConfig
 struct SignerInternalConfig {
     /// The algorithm of the Signer as Signing Alg
     alg: c2pa::SigningAlg,
@@ -58,19 +74,11 @@ impl C2paSigner {
         }
     }
 
-    // fn certs(pem_certs: &[u8]) -> Result<Vec<Vec<u8>>> {
-    //     let signcerts = openssl::x509::X509::stack_from_pem(pem_certs)
-    //         .map_err(|e| C2paError::Sdk(c2pa::Error::OpenSslError(e)))?;
-    //     let mut certs: Vec<Vec<u8>> = Vec::new();
-    //     for c in signcerts {
-    //         let cert = c
-    //             .to_der()
-    //             .map_err(|e| C2paError::Sdk(c2pa::Error::OpenSslError(e)))?;
-    //         certs.push(cert);
-    //     }
-    //     Ok(certs)
-    // }
-
+    /// Configure the signer with the given config
+    /// # Arguments
+    /// * `config` - the configuration for the signer
+    /// # Returns
+    /// * `Result<()>` - Ok(()) if successful, otherwise an error
     pub fn configure(&self, config: &SignerConfig) -> Result<()> {
         if let Ok(mut settings) = RwLock::write(&self.settings) {
             settings.alg = c2pa::SigningAlg::from_str(&config.alg)
@@ -79,8 +87,6 @@ impl C2paSigner {
                 pem::parse_many(&config.certs).map_err(|e| C2paError::Other(e.to_string()))?;
             settings.certs = pems.drain(..).map(|p| p.into_contents()).collect();
 
-            //settings.certs = Self::certs(&config.certs).expect("Failed to parse certs"  );
-            //println!("certs = {:?}", settings.certs);
             settings.reserve_size = config.certs.len() as u64 + 20000; /* todo: call out to TSA to get actual timestamp and use that size */
 
             settings.time_authority_url = config.time_authority_url.clone();
@@ -123,6 +129,7 @@ impl c2pa::Signer for C2paSigner {
     }
 }
 
+/// Defines the callback interface for a signer
 pub trait SignerCallback: Send + Sync {
     /// Read a stream of bytes from the stream
     fn sign(&self, bytes: Vec<u8>) -> StreamResult<Vec<u8>>;

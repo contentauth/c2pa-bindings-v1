@@ -11,14 +11,13 @@
 // specific language governing permissions and limitations under
 // each license.
 
+use std::sync::RwLock;
+
+use c2pa::ManifestStore;
+
 use crate::{
     error::{C2paError, Result},
-    Stream,
-};
-use c2pa::ManifestStore;
-use std::{
-    io::{Read, Seek, Write},
-    sync::RwLock,
+    Stream, StreamAdapter,
 };
 
 struct ReaderSettings {}
@@ -35,8 +34,6 @@ impl ManifestStoreReader {
     /// # Returns
     /// * `ManifestStoreReader` - the new ManifestStoreReader
     ///
-    /// # Safety
-    /// The ManifestStoreReader is not thread safe. It is intended to be used
     pub fn new() -> Self {
         Self {
             _settings: ReaderSettings {},
@@ -52,15 +49,8 @@ impl ManifestStoreReader {
     /// * `Result<String>` - the json representation of the manifest store
     ///    or an error
     ///
-    //pub fn read(&self, format: &str, mut stream: impl Read + Seek) -> Result<String> {
-    pub fn read_stream(&self, format: &str, stream: Box<dyn Stream>) -> Result<String> {
-        // todo: use ManifestStore::from_stream, when it exists
-
-        // let x_ptr = stream as *const dyn Stream as *mut dyn Stream;
-        // let x_mut_ref = unsafe { &mut *x_ptr };
-        let stream_ptr = &*stream as *const dyn Stream as *mut dyn Stream;
-        let stream_ptr = unsafe { &mut *stream_ptr };
-        let mut stream = crate::stream::StreamAdapter::from_stream(stream_ptr);
+    pub fn read_stream(&self, format: &str, stream: &dyn Stream) -> Result<String> {
+        let mut stream = StreamAdapter::from(stream);
         self.read(format, &mut stream)
     }
 
@@ -72,7 +62,7 @@ impl ManifestStoreReader {
     /// * `Result<String>` - the json representation of the manifest store
     ///    or an error
     ///
-    pub fn read(&self, format: &str, mut stream: impl Read + Seek) -> Result<String> {
+    pub fn read(&self, format: &str, stream: &mut dyn c2pa::CAIReadWrite) -> Result<String> {
         // todo: use ManifestStore::from_stream, when it exists
         let mut bytes = Vec::new();
         let _len = stream.read_to_end(&mut bytes).map_err(C2paError::Io)?;
@@ -121,6 +111,16 @@ impl ManifestStoreReader {
         }
     }
 
+    pub fn resource_write_stream(
+        &self,
+        manifest_label: &str,
+        id: &str,
+        stream: &dyn Stream,
+    ) -> Result<()> {
+        let mut stream = StreamAdapter::from(stream);
+        self.resource_write(manifest_label, id, &mut stream)
+    }
+
     /// writes a resource from the manifest store to the stream
     /// # Arguments
     /// * `manifest` - the manifest id
@@ -133,7 +133,7 @@ impl ManifestStoreReader {
         &self,
         manifest_label: &str,
         id: &str,
-        mut stream: impl Write + Seek,
+        stream: &mut dyn c2pa::CAIReadWrite,
     ) -> Result<()> {
         self.resource(manifest_label, id)
             .and_then(|bytes| stream.write_all(&bytes).map_err(C2paError::Io))
@@ -150,12 +150,15 @@ impl Default for ManifestStoreReader {
 
 mod tests {
     use super::*;
+    use crate::test_stream::TestStream;
+
+    const IMAGE: &'static [u8] = include_bytes!("../tests/fixtures/C.jpg");
 
     #[test]
     fn test_manifest_store_reader() {
-        let input = std::fs::File::open("tests/fixtures/C.jpg").expect("Failed to open test file");
+        let mut input = TestStream::from_memory(IMAGE.to_vec());
         let reader = ManifestStoreReader::new();
-        let json = reader.read("image/jpeg", input).unwrap();
+        let json = reader.read_stream("image/jpeg", &mut input).unwrap();
         println!("Json = {}", json);
         assert!(json.contains("\"format\": \"image/jpeg\""));
         assert!(json.contains("\"title\": \"C.jpg\""));

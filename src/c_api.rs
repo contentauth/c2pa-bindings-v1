@@ -11,14 +11,11 @@
 // specific language governing permissions and limitations under
 // each license.
 
-use std::{
-    ffi::{c_char, c_int, c_long, CStr, CString},
-    io::{Read, Seek, SeekFrom, Write},
-};
+use std::ffi::{c_char, c_int, c_long, CStr, CString};
 
 use crate::{
     C2paError, C2paSigner, ManifestBuilder, ManifestBuilderSettings, ManifestStoreReader, SeekMode,
-    SignerConfig,
+    SignerConfig, StreamAdapter, StreamError, StreamResult,
 };
 
 /// Defines a callback to read from a stream
@@ -48,6 +45,8 @@ pub struct StreamContext {
     _priv: (),
 }
 
+/// Configuration settings for the ManifestBuilder
+/// this is mostly a placeholder for future expansion
 #[repr(C)]
 pub struct ManifestBuilderSettingsC {
     pub claim_generator: *const c_char,
@@ -94,20 +93,6 @@ impl _C2paConfigC {
             ingredient_option: 0,
         }
     }
-    // unsafe fn to_rust(&self) -> C2paConfig {
-    //     crate::C2paConfig {
-    //         data_dir: if self.data_dir.is_null() {
-    //             None
-    //         } else {
-    //             Some(from_c_str(self.data_dir))
-    //         },
-    //         dest_option: self.dest_option.try_into().unwrap_or(DestOption::Embed),
-    //         ingredient_option: self
-    //             .ingredient_option
-    //             .try_into()
-    //             .unwrap_or(IngredientOption::None),
-    //     }
-    // }
 }
 
 #[repr(C)]
@@ -118,11 +103,13 @@ struct CSignerCallback {
 }
 
 impl crate::SignerCallback for CSignerCallback {
-    fn sign(&self, data: Vec<u8>) -> crate::StreamResult<Vec<u8>> {
+    fn sign(&self, data: Vec<u8>) -> StreamResult<Vec<u8>> {
         //println!("SignerCallback signing {:p} {}",self, data.len());
+        // We must preallocate the signature buffer to the maximum size
+        // so that it can be filled by the callback
         let sig_max_size = 100000;
         let mut signature = vec![0; sig_max_size];
-        //let mut signature: *mut u8 = std::ptr::null_mut();
+
         // This callback returns the size of the signature, if negative it means there was an error
         let sig: *mut u8 = signature.as_ptr() as *mut u8;
         let result = unsafe {
@@ -135,13 +122,12 @@ impl crate::SignerCallback for CSignerCallback {
         };
         if result < 0 {
             // todo: return errors from callback
-            return Err(crate::StreamError::Other {
+            return Err(StreamError::Other {
                 reason: "signer error".to_string(),
             });
         }
         signature.truncate(result as usize);
-        //println!("SignerCallback signing result {}", signature.len());
-        //let signature = unsafe { Vec::from_raw_parts(signature, result as usize, result as usize) };
+
         Ok(signature)
     }
 }
@@ -209,144 +195,22 @@ impl C2paStream {
 }
 
 impl crate::Stream for C2paStream {
-    fn read_stream(&self, len: u64) -> crate::StreamResult<Vec<u8>> {
+    fn read_stream(&self, len: u64) -> StreamResult<Vec<u8>> {
         let mut buf = vec![0; len as usize];
-        let bytes_read = unsafe { (self.read_callback)(&(*self.context), buf.as_mut_ptr(), buf.len()) };
+        let bytes_read =
+            unsafe { (self.read_callback)(&(*self.context), buf.as_mut_ptr(), buf.len()) };
         buf.truncate(bytes_read as usize);
         Ok(buf)
     }
-    fn seek_stream(&self, pos: i64, mode: SeekMode) -> crate::StreamResult<u64> {
+    fn seek_stream(&self, pos: i64, mode: SeekMode) -> StreamResult<u64> {
         let new_pos = unsafe { (self.seek_callback)(&(*self.context), pos as c_long, mode) };
         Ok(new_pos as u64)
     }
-    fn write_stream(&self, data: Vec<u8>) -> crate::StreamResult<u64> {
-        let bytes_written = unsafe { (self.write_callback)(&(*self.context), data.as_ptr(), data.len()) };
+    fn write_stream(&self, data: Vec<u8>) -> StreamResult<u64> {
+        let bytes_written =
+            unsafe { (self.write_callback)(&(*self.context), data.as_ptr(), data.len()) };
         Ok(bytes_written as u64)
     }
-}
-
-impl Read for C2paStream {
-    // implements Rust Read trait by calling back to the C read callback
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        let context = &(*self.context);
-        let bytes_read = unsafe { (self.read_callback)(context, buf.as_mut_ptr(), buf.len()) };
-        if bytes_read < 0 {
-            //println!("read_stream error{}", bytes_read);
-            return Err(std::io::Error::last_os_error());
-        }
-        //println!("C2paStream.read {:p} context={:p} bytes read={}",self, context, bytes_read);
-        Ok(bytes_read as usize)
-    }
-}
-
-impl Seek for C2paStream {
-    // implements Rust Seek trait by calling back to the C seek callback
-    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
-        //let context: &StreamContext = &self.context;
-        let context = &(*self.context);
-        let (pos, whence) = match pos {
-            SeekFrom::Current(pos) => (pos, SeekMode::Current),
-            SeekFrom::Start(pos) => (pos as i64, SeekMode::Start),
-            SeekFrom::End(pos) => (pos, SeekMode::End),
-        };
-        //println!("C2paStream.seek {:p} context = {:p} whence = {:?} pos={}", self, context, whence, pos);
-        let new_pos = unsafe { (self.seek_callback)(context, pos as c_long, whence) };
-        if new_pos < 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-        //println!("C2paStream.seek {:p} context = {:p} whence = {:?} pos={}", self, context, whence, new_pos);
-        Ok(new_pos as u64)
-    }
-}
-
-impl Write for C2paStream {
-    // implements Rust Write trait by calling back to the C write callback
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        let context = &(*self.context);
-        let bytes_written = unsafe { (self.write_callback)(context, buf.as_ptr(), buf.len()) };
-        if bytes_written < 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-        //println!("C2paStream.write {}", bytes_written);
-        Ok(bytes_written as usize)
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(()) // todo: do we need to expose this?
-    }
-}
-
-// unsafe impl Send for C2paStream {}
-
-impl c2pa::CAIRead for C2paStream {}
-
-impl c2pa::CAIReadWrite for C2paStream {}
-
-impl Into<Box<dyn c2pa::CAIRead>> for C2paStream {
-    fn into(self) -> Box<dyn c2pa::CAIRead> {
-        Box::new(self)
-    }
-}
-
-impl Into<Box<dyn crate::Stream>> for C2paStream {
-    fn into(self) -> Box<dyn crate::Stream> {
-        Box::new(self)
-    }
-}
-// impl Stream for C2paStream {
-//     fn read_stream(&self, len: u64) -> crate::StreamResult<Vec<u8>> {
-//         self.read_callback(&*self.context, std::ptr::null_mut(), len as usize);
-//         // let mut buf = vec![0; len as usize];
-//         // let bytes_read = self.read(buf.as_mut_slice())
-//         //     .map_err(|e| crate::StreamError::Other{reason: e.to_string()})?;
-//         // buf.truncate(bytes_read);
-//         // Ok(buf)
-//     }
-
-//     fn write_stream(&self, data: Vec<u8>) -> crate::StreamResult<u64> {
-//         let count = self.write(data.as_slice())
-//             .map_err(|e| crate::StreamError::Other{reason: e.to_string()})?;
-//         Ok(count as u64)
-//     }
-
-//     fn seek_stream(&mut self, pos: i64, mode: c2pa::SeekMode) -> crate::StreamResult<u64> {
-//         let whence = match mode {
-//             c2pa::SeekMode::Start => SeekFrom::Start(pos as u64),
-//             c2pa::SeekMode::Current => SeekFrom::Current(pos),
-//             c2pa::SeekMode::End => SeekFrom::End(pos),
-//         };
-//         let new_pos = self.seek(whence)?;
-//         Ok(new_pos)
-//     }
-// }
-
-// impl Into<Box<dyn Stream>> for C2paStream {
-//     fn into(self) -> Box<dyn Stream> {
-//         Box::new(StreamAdapter::from_stream(Box::new(self)))
-//     }
-// }
-
-/// Creates a new C2paStream from context with callbacks
-///
-/// This allows implementing streams in other languages
-///
-/// # Arguments
-/// * `context` - a pointer to a StreamContext
-/// * `read` - a ReadCallback to read from the stream
-/// * `seek` - a SeekCallback to seek in the stream
-/// * `write` - a WriteCallback to write to the stream
-///     
-/// # Safety
-/// The context must remain valid for the lifetime of the C2paStream
-/// The resulting C2paStream must be released by calling c2pa_release_stream
-///
-#[no_mangle]
-pub unsafe extern "C" fn c2pa_create_stream(
-    context: *mut StreamContext,
-    read: ReadCallback,
-    seek: SeekCallback,
-    write: WriteCallback,
-) -> *mut C2paStream {
-    Box::into_raw(Box::new(C2paStream::new(context, read, seek, write)))
 }
 
 // Internal routine to convert a *const c_char to a rust String
@@ -397,6 +261,30 @@ pub unsafe extern "C" fn c2pa_supported_extensions() -> *mut c_char {
     to_c_string(serde_json::to_string(&crate::supported_extensions()).unwrap_or_default())
 }
 
+/// Creates a new C2paStream from context with callbacks
+///
+/// This allows implementing streams in other languages
+///
+/// # Arguments
+/// * `context` - a pointer to a StreamContext
+/// * `read` - a ReadCallback to read from the stream
+/// * `seek` - a SeekCallback to seek in the stream
+/// * `write` - a WriteCallback to write to the stream
+///     
+/// # Safety
+/// The context must remain valid for the lifetime of the C2paStream
+/// The resulting C2paStream must be released by calling c2pa_release_stream
+///
+#[no_mangle]
+pub unsafe extern "C" fn c2pa_create_stream(
+    context: *mut StreamContext,
+    read: ReadCallback,
+    seek: SeekCallback,
+    write: WriteCallback,
+) -> *mut C2paStream {
+    Box::into_raw(Box::new(C2paStream::new(context, read, seek, write)))
+}
+
 /// Verify a stream and return a ManifestStore report
 ///
 /// # Errors
@@ -406,9 +294,10 @@ pub unsafe extern "C" fn c2pa_supported_extensions() -> *mut c_char {
 /// The returned value MUST be released by calling release_string
 /// and it is no longer valid after that call.
 #[no_mangle]
-pub unsafe extern "C" fn c2pa_verify_stream(reader: C2paStream) -> *mut c_char {
+pub unsafe extern "C" fn c2pa_verify_stream(reader: &mut C2paStream) -> *mut c_char {
     let manifest_store = ManifestStoreReader::new();
-    let result = manifest_store.read("image/jpeg", reader);
+    let mut reader = StreamAdapter::from_stream_mut(reader);
+    let result = manifest_store.read("image/jpeg", &mut reader);
     let str = match result {
         Ok(json) => json,
         Err(e) => {
@@ -464,11 +353,12 @@ pub unsafe extern "C" fn c2pa_manifest_reader_new() -> *mut ManifestStoreReader 
 pub unsafe extern "C" fn c2pa_manifest_reader_read(
     reader_ptr: *mut *mut ManifestStoreReader,
     format: *const c_char,
-    stream: C2paStream,
+    stream: *mut C2paStream,
 ) -> *mut c_char {
     let reader = Box::from_raw(*reader_ptr);
+    let mut stream = StreamAdapter::from_stream_mut(&mut (*stream));
     let format = from_c_str(format);
-    let result = reader.read(&format, stream);
+    let result = reader.read(&format, &mut stream);
     let str = match result {
         Ok(json) => json,
         Err(e) => {
@@ -512,10 +402,11 @@ pub unsafe extern "C" fn c2pa_manifest_reader_resource(
     stream: *mut C2paStream,
 ) {
     let reader = Box::from_raw(*reader_ptr);
-    let stream = &mut *stream;
+    //let stream = &mut *stream;
+    let mut stream = StreamAdapter::from_stream_mut(&mut (*stream));
     let manifest_label = from_c_str(manifest_label);
     let id = from_c_str(id);
-    let result = reader.resource_write(&manifest_label, &id, stream);
+    let result = reader.resource_write(&manifest_label, &id, &mut stream);
     if let Err(e) = result {
         e.set_last();
     }
@@ -582,26 +473,15 @@ pub unsafe extern "C" fn c2pa_create_manifest_builder(
 ///
 pub unsafe extern "C" fn c2pa_manifest_builder_sign(
     builder_ptr: *mut *mut ManifestBuilder,
-    signer: *mut C2paSigner,
+    signer: *const C2paSigner,
     input: *mut C2paStream,
     output: *mut C2paStream,
 ) -> c_int {
     let builder = Box::from_raw(*builder_ptr);
-    let signer = Box::from_raw(signer);
-    let mut input = Box::from_raw(input);
-    let output_stream = match output.is_null() {
-        true => None,
-        //false => Some(Box::from_raw(output))
-        false => Some(crate::stream::StreamAdapter::from_stream(&mut(*output))), // Some(&mut *output),
-    };
-     //println!("c2pa_manifest_builder_sign input {:p}, context {:p}", &(*input), input.context);
-    //input.seek(SeekFrom::Start(0)).unwrap();
-    let mut input_stream = crate::stream::StreamAdapter::from_stream(&mut(*input));
-    let result = builder.sign_cai_read(&(*signer), &mut input_stream, output_stream);
-    //let result = builder.sign_stream(&(*signer), input, output_stream);
+    let mut input_ref = StreamAdapter::from_stream_mut(&mut (*input));
+    let mut output_ref = StreamAdapter::from_stream_mut(&mut (*output));
+    let result = builder.read(&(*signer), &mut input_ref, &mut output_ref);
     *builder_ptr = Box::into_raw(builder);
-    Box::into_raw(signer);
-    Box::into_raw(input);
     match result {
         Ok(_) => 0,
         Err(e) => {

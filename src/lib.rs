@@ -35,7 +35,6 @@ mod test_stream;
 
 #[cfg(test)]
 mod test_signer;
-//pub use test_signer::local_sign;
 
 uniffi::include_scaffolding!("c2pa");
 

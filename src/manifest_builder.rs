@@ -11,22 +11,15 @@
 // specific language governing permissions and limitations under
 // each license.
 
-use std::{
-    collections::HashMap,
-    io::{Read, Seek, Write},
-    sync::RwLock,
-};
+use std::{collections::HashMap, sync::RwLock};
 
-use c2pa::Manifest;
+use c2pa::{CAIRead, CAIReadWrite, Manifest, Signer};
 
 use crate::{
     error::{C2paError, Result},
     stream::{Stream, StreamAdapter},
+    C2paSigner,
 };
-
-
-
-//pub struct Signer {}
 
 pub struct ManifestBuilderSettings {
     pub generator: String,
@@ -37,7 +30,7 @@ trait StreamResolver: Send + Sync {
 }
 
 struct StreamTable {
-    streams: HashMap<String, Box<dyn Stream>>
+    streams: HashMap<String, Box<dyn Stream>>,
 }
 
 impl StreamResolver for StreamTable {
@@ -55,7 +48,7 @@ impl ManifestBuilder {
     pub fn new(settings: &ManifestBuilderSettings) -> Self {
         Self {
             manifest: RwLock::new(Manifest::new(settings.generator.clone())),
-            _resolvers: Vec::new()
+            _resolvers: Vec::new(),
         }
     }
 
@@ -87,59 +80,32 @@ impl ManifestBuilder {
 
     pub fn add_resource_stream(&mut self, _id: &str, _stream: Box<dyn Stream>) -> Result<&Self> {
         Ok(self)
-    } 
+    }
 
     pub fn sign_stream(
         &self,
-        signer: &crate::signer::C2paSigner,
-        input: Box<dyn Stream>,
-        output: Option<Box<dyn Stream>>, // Option<impl Read + Write + Seek>,
-        //_c2pa_data: Option<impl Write>,
+        signer: &C2paSigner,
+        input_mut: &dyn Stream,
+        output_mut: &dyn Stream,
     ) -> Result<()> {
-        // uniffi doesn't allow &mut parameters, so we need to convert this
-        let input_ref = &*input as *const dyn Stream as *mut dyn Stream;
-        let input_ref = unsafe { &mut *input_ref };
-        let mut input = StreamAdapter::from_stream(input_ref);
-        self.sign(signer, &mut input, output)
+        let mut input = StreamAdapter::from(input_mut);
+        let mut output = StreamAdapter::from(output_mut);
+        self.read(signer, &mut input, &mut output)
     }
 
-    fn sign(
+    pub fn read(
         &self,
-        signer: &dyn c2pa::Signer,
-        input: &mut StreamAdapter,
-        output: Option<Box<dyn Stream>>, // Option<impl Read + Write + Seek>,
-        //_c2pa_data: Option<impl Write>,
+        signer: &dyn Signer,
+        input: &mut dyn CAIRead,
+        output: &mut dyn CAIReadWrite,
     ) -> Result<()> {
         if let Ok(mut manifest) = self.manifest.try_write() {
             let format = manifest.format().to_string();
             let result = manifest
                 .embed_stream(&format, input, signer)
                 .map_err(C2paError::Sdk)?;
-            if let Some(output) = output {
-                (&output).write_all(&result).map_err(C2paError::Io)?;
-            };
-            Ok(())
-        } else {
-            Err(C2paError::RwLock)
-        }
-    }
 
-    pub fn sign_cai_read(
-        &self,
-        signer: &dyn c2pa::Signer,
-        input: &mut dyn c2pa::CAIRead,
-        output: Option<impl Read + Write + Seek>,
-        //_c2pa_data: Option<impl Write>,
-    ) -> Result<()> {
-        if let Ok(mut manifest) = self.manifest.try_write() {
-            let format = manifest.format().to_string();
-            //println!("format: {}", format );
-            let result = manifest
-                .embed_stream(&format, input, signer)
-                .map_err(C2paError::Sdk)?;
-            if let Some(mut output) = output {
-                output.write_all(&result).map_err(C2paError::Io)?;
-            };
+            output.write_all(&result).map_err(C2paError::Io)?;
             Ok(())
         } else {
             Err(C2paError::RwLock)
@@ -149,9 +115,9 @@ impl ManifestBuilder {
 
 #[cfg(test)]
 mod tests {
-    //use openssl;
     use super::*;
-    use crate::test_stream::TestStream;
+    use crate::{signer::C2paSigner, test_signer::TestSigner, test_stream::TestStream, SeekMode};
+    use std::io::Seek;
 
     const MANIFEST_JSON: &str = r#"
     {
@@ -163,7 +129,7 @@ mod tests {
 
     const IMAGE: &'static [u8] = include_bytes!("../tests/fixtures/A.jpg");
     const CERTS: &'static [u8] = include_bytes!("../tests/fixtures/ps256.pub");
-    const PKEY: &'static [u8] = include_bytes!("../tests/fixtures/ps256.pem");
+    const P_KEY: &'static [u8] = include_bytes!("../tests/fixtures/ps256.pem");
 
     #[test]
     fn test_manifest_builder() {
@@ -175,22 +141,18 @@ mod tests {
             .from_json(MANIFEST_JSON)
             .expect("Failed to load manifest Json");
         let mut input = TestStream::from_memory(IMAGE.to_vec());
-        let mut input = StreamAdapter::from_stream(&mut input);
+        let mut input = StreamAdapter::from_stream_mut(&mut input);
         //let mut output = Cursor::new(Vec::new());
-        let output = Box::new(TestStream::new());
-        let signer = c2pa::create_signer::from_keys(
-            CERTS,
-            PKEY,
-            c2pa::SigningAlg::Ps256,
-            None,
-        )
-        .map_err(C2paError::Sdk)
-        .expect("Failed to create signer");
+        let mut output = TestStream::new();
+        let mut output = StreamAdapter::from_stream_mut(&mut output);
+        let signer = c2pa::create_signer::from_keys(CERTS, P_KEY, c2pa::SigningAlg::Ps256, None)
+            .map_err(C2paError::Sdk)
+            .expect("Failed to create signer");
         builder
-            .sign(&*signer, &mut input, Some(output))
+            .read(&*signer, &mut input, &mut output)
             .expect("Failed to sign");
-        //let result = output.data();
-        //assert_eq!(result.len(), 134165);
+        let len = output.seek(std::io::SeekFrom::End(0)).unwrap();
+        assert_eq!(len, 134165);
     }
 
     #[test]
@@ -202,18 +164,16 @@ mod tests {
         builder
             .from_json(MANIFEST_JSON)
             .expect("Failed to load manifest Json");
-        let input = TestStream::from_memory(IMAGE.to_vec());
-        let output = Box::new(TestStream::new());
-        let test_signer = Box::new(crate::test_signer::TestSigner::new());
+        let mut input = TestStream::from_memory(IMAGE.to_vec());
+        let mut output = TestStream::new();
+        let test_signer = Box::new(TestSigner::new());
         let config = test_signer.config();
-        let signer = crate::signer::C2paSigner::new(test_signer);
+        let signer = C2paSigner::new(test_signer);
         signer.configure(&config).expect("Signer config failed");
         builder
-            .sign_stream(&signer, Box::new(input), Some(output))
+            .sign_stream(&signer, &mut input, &mut output)
             .expect("Failed to sign");
-       // let result = output.data();
-        // std::fs::write("target/manifest_builder.jpg", &result).expect("Failed to write test file");
-        // assert_eq!(result.len(), 143141);
+        let len = output.seek_stream(0, SeekMode::End).unwrap();
+        assert_eq!(len, 143141);
     }
-
 }
