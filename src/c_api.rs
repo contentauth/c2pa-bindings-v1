@@ -480,7 +480,7 @@ pub unsafe extern "C" fn c2pa_manifest_builder_sign(
     let builder = Box::from_raw(*builder_ptr);
     let mut input_ref = StreamAdapter::from_stream_mut(&mut (*input));
     let mut output_ref = StreamAdapter::from_stream_mut(&mut (*output));
-    let result = builder.read(&(*signer), &mut input_ref, &mut output_ref);
+    let result = builder.sign(&(*signer), &mut input_ref, &mut output_ref);
     *builder_ptr = Box::into_raw(builder);
     match result {
         Ok(_) => 0,

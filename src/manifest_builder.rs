@@ -90,10 +90,10 @@ impl ManifestBuilder {
     ) -> Result<()> {
         let mut input = StreamAdapter::from(input_mut);
         let mut output = StreamAdapter::from(output_mut);
-        self.read(signer, &mut input, &mut output)
+        self.sign(signer, &mut input, &mut output)
     }
 
-    pub fn read(
+    pub fn sign(
         &self,
         signer: &dyn Signer,
         input: &mut dyn CAIRead,
@@ -149,7 +149,7 @@ mod tests {
             .map_err(C2paError::Sdk)
             .expect("Failed to create signer");
         builder
-            .read(&*signer, &mut input, &mut output)
+            .sign(&*signer, &mut input, &mut output)
             .expect("Failed to sign");
         let len = output.seek(std::io::SeekFrom::End(0)).unwrap();
         assert_eq!(len, 134165);
