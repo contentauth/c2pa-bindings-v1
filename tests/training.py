@@ -1,6 +1,19 @@
+# Copyright 2023 Adobe. All rights reserved.
+# This file is licensed to you under the Apache License,
+# Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+# or the MIT license (http://opensource.org/licenses/MIT),
+# at your option.
+# Unless required by applicable law or agreed to in writing,
+# this software is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR REPRESENTATIONS OF ANY KIND, either express or
+# implied. See the LICENSE-MIT and LICENSE-APACHE files for the
+# specific language governing permissions and limitations under
+# each license.
+
 import json
 import os
 import sys
+
 # load the c2pa_uniffi module from wherever you keep it
 # In this case, it's in the target/python folder
 PROJECT_PATH = os.getcwd()
@@ -8,49 +21,71 @@ SOURCE_PATH = os.path.join(
     PROJECT_PATH,"target","python"
 )
 sys.path.append(SOURCE_PATH)
-testFile = os.path.join(PROJECT_PATH,"tests","fixtures","C.jpg")
 
-import c2pa_uniffi as c2pa;
+import c2pa;
 
-# convert the manifestStore to a python object
-class ManifestStore:
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            if isinstance(value, dict):
-                self.__dict__[key] = ManifestStore(**value)
-            else:
-                self.__dict__[key] = value
+# set up paths to the files we we are using
+testFile = os.path.join(PROJECT_PATH,"tests","fixtures","A.jpg")
+pemFile = os.path.join(PROJECT_PATH,"tests","fixtures","es256_certs.pem")
+keyFile = os.path.join(PROJECT_PATH,"tests","fixtures","es256_private.key")
+testOutputFile = os.path.join(PROJECT_PATH,"target","dnt.jpg")
 
-try:
-    report = c2pa.verify_from_file_json(testFile)
+# a little helper function to get a value from a nested dictionary
+from functools import reduce
+import operator
+def getitem(d, key):
+    return reduce(operator.getitem, key, d)
+
+# first create an asset with a do not train assertion
+
+# define a manifest with the do not train assertion
+manifest_json = json.dumps({
+    "claim_generator": "python_test/0.1",
+    "assertions": [
+    {
+      "label": "c2pa.training-mining",
+      "data": {
+        "entries": {
+          "c2pa.ai_generative_training": { "use": "notAllowed" },
+          "c2pa.ai_inference": { "use": "notAllowed" },
+          "c2pa.ai_training": { "use": "notAllowed" },
+          "c2pa.data_mining": { "use": "notAllowed" }
+        }
+      }
+    }
+  ]
+ })
+
+# add the manifest to the asset
+try: 
+    # set up the signer info loading the pem and key files
+    test_pem = open(pemFile,"rb").read()
+    test_key = open(keyFile,"rb").read()
+    sign_info = c2pa.SignerInfo(test_pem, test_key, "es256", "http://timestamp.digicert.com")
+
+    result = c2pa.add_manifest_to_file_json(testFile, testOutputFile, manifest_json, sign_info, False, None)
 except Exception as err:
     sys.exit(err)
 
-jsonStore = json.loads(report)
+print("successfully added do not train manifest to file " + testOutputFile)
 
-manifestStore = ManifestStore(**jsonStore)
 
-activeManifest = manifestStore.active_manifest
-print(activeManifest)
+# now verify the asset and check the manifest for a do not train assertion
 
-#manifest = manifestStore.manifests[manifestStore.active_manifest]
-manifest = jsonStore["manifests"][jsonStore["active_manifest"]]
+allowed = True # opt out model, assume training is ok if the assertion doesn't exist
+try:
+    manifest_store = json.loads(c2pa.verify_from_file_json(testOutputFile))
 
-print(manifest.title, manifest.format, manifest.claim_generator)
-for assertion in manifest.assertions:
-    if assertion.label == "c2pa.training-mining":
-        entries = assertion.data.entries
-        if entries.c2pa.ai_training == "notAllowed":
-            print("not allowed")
-        print(entries.c2pa.ai_training)
+    manifest = manifest_store["manifests"][manifest_store["active_manifest"]]
+    for assertion in manifest["assertions"]:
+        if assertion["label"] == "c2pa.training-mining":
+            if getitem(assertion, ("data","entries","c2pa.ai_training","use")) == "notAllowed":
+                allowed = False
+except Exception as err:
+    sys.exit(err)
 
-manifest = jsonStore["manifests"][jsonStore["active_manifest"]]
+if allowed:
+    print("Training is allowed")
+else:
+    print("Training is not allowed")
 
-print(manifest["title"], manifest["format"], manifest["claim_generator"])
-
-allowed = True # opt out model
-assertions = manifest["assertions"]
-for assertion in assertions:
-    if assertion["label"] == "c2pa.training-mining":
-        allowed = assertion["data"]["entries"]["c2pa.ai_training"] == "notAllowed" 
-    print(assertion)

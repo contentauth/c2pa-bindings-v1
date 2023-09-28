@@ -1,37 +1,20 @@
-use c2pa::{Error, Ingredient, Manifest, ManifestStore};
+// Copyright 2023 Adobe. All rights reserved.
+// This file is licensed to you under the Apache License,
+// Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+// or the MIT license (http://opensource.org/licenses/MIT),
+// at your option.
+// Unless required by applicable law or agreed to in writing,
+// this software is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR REPRESENTATIONS OF ANY KIND, either express or
+// implied. See the LICENSE-MIT and LICENSE-APACHE files for the
+// specific language governing permissions and limitations under
+// each license.
+
 use std::path::PathBuf;
 
-// pub struct SignerData {
-//     signer: std::sync::Arc<Box<dyn Signer>>,
-//     tsa_url: Option<String>,
-// }
+use c2pa::{Error, Ingredient, Manifest, ManifestStore};
+
 use crate::SignerInfo;
-
-// pub struct C2paSigner {
-//     signer: Option<Box<dyn Signer>>
-// }
-
-// impl C2paSigner {
-//     pub fn new() -> Self {
-//         Self { signer: None }
-//     }
-
-//     pub fn from_keys(signcert: &str, pkey: &str, alg: &str, tsa_url: Option<&str>) -> C2paSigner {
-//         let alg = alg
-//         .to_lowercase()
-//         .parse()
-//         .map_err(|_| c2pa::Error::UnsupportedType).unwrap;
-//         let tsa_url = tsa_url.map(|s| s.to_string());
-//         let signer = create_signer::from_keys(signcert.as_bytes(), pkey.as_bytes(), alg, tsa_url).unwrap();
-//         Self {
-//             signer: Some(signer)
-//         }
-//     }
-
-//     fn signer(&self) -> Result<&dyn Signer, Error> {
-//         self.signer.as_ref().ok_or(Error::NotFound).map(|s| s.as_ref())
-//     }
-// }
 
 /// Pass in a file path and return a ManifestStore Result string in JSON format
 ///
@@ -47,15 +30,6 @@ pub fn ingredient_from_file_json(path: &str, data_dir: &str) -> Result<String, E
     Ok(Ingredient::from_file_with_folder(path, data_dir)?.to_string())
 }
 
-// pub fn create_signer(signcert: &str, pkey: &str, alg: &str, tsa_url: Option<&str>) -> Result<Box<dyn Signer>, Error> {
-//     let alg = alg
-//     .to_lowercase()
-//     .parse()
-//     .map_err(|_| c2pa::Error::UnsupportedType)?;
-//     let tsa_url = tsa_url.map(|s| s.to_string());
-//     create_signer::from_keys(signcert.as_bytes(), pkey.as_bytes(), alg, tsa_url)
-// }
-
 /// Pass in a source and destination file path, a Manifest, and SignerInfo in JSON
 /// and return Result with the binary manifest generated.
 ///
@@ -68,7 +42,6 @@ pub fn add_manifest_to_file_json(
     side_car: bool,
     remote_url: Option<String>,
 ) -> Result<Vec<u8>, Error> {
-
     let mut manifest = Manifest::from_json(manifest_info)?;
 
     // read any manifest referenced files from the source path

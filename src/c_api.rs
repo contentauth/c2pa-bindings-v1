@@ -1,19 +1,17 @@
-// ADOBE CONFIDENTIAL
-// Copyright 2022 Adobe
-// All Rights Reserved.
-//
-// NOTICE: All information contained herein is, and remains
-// the property of Adobe and its suppliers, if any. The intellectual
-// and technical concepts contained herein are proprietary to Adobe
-// and its suppliers and are protected by all applicable intellectual
-// property laws, including trade secret and copyright laws.
-// Dissemination of this information or reproduction of this material
-// is strictly forbidden unless prior written permission is obtained
-// from Adobe.
+// Copyright 2023 Adobe. All rights reserved.
+// This file is licensed to you under the Apache License,
+// Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+// or the MIT license (http://opensource.org/licenses/MIT),
+// at your option.
+// Unless required by applicable law or agreed to in writing,
+// this software is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR REPRESENTATIONS OF ANY KIND, either express or
+// implied. See the LICENSE-MIT and LICENSE-APACHE files for the
+// specific language governing permissions and limitations under
+// each license.
 
 use std::{
     ffi::{CStr, CString},
-    // ptr::null_mut,
     os::raw::c_char,
 };
 
@@ -124,37 +122,12 @@ pub unsafe extern "C" fn c2pa_ingredient_from_file(
     result_to_c_string(response)
 }
 
-/// Create a singer using the provided certificate and private key
-/// tsa_url is optional and may be null
-///
-/// # Errors
-/// Returns null if an error occurred
-///
-/// # Safety
-/// Reads from null terminated C strings
-/// The returned value MUST be released by calling release_signer
-/// and it is no longer valid after that call.
-// #[no_mangle]
-// pub unsafe extern "C" fn c2pa_create_signer(signcert: *const c_char, pkey: *const c_char, alg: *const c_char, tsa_url: *const c_char) -> *mut Box<dyn Signer> {
-//     let signcert = from_c_str(signcert);
-//     let pkey = from_c_str(pkey);
-//     let alg = from_c_str(alg);
-//     let tsa_url = if tsa_url.is_null() { Some(from_c_str(tsa_url))} else { None};
-
-//     let response = match create_signer(&signcert, &pkey, &alg, tsa_url.as_deref()) {
-//         Ok(r) => Box::into_raw(Box::new(r)),
-//         Err(_) => return null_mut(),
-//     };
-//     response
-// }
-
-
 #[repr(C)]
 pub struct SignerInfoC {
     pub signcert: *const c_char,
     pub pkey: *const c_char,
-    pub alg:  *const c_char,
-    pub tsa_url:  *const c_char,
+    pub alg: *const c_char,
+    pub tsa_url: *const c_char,
 }
 
 /// Add a signed manifest to the file at path using auth_token
@@ -173,7 +146,6 @@ pub unsafe extern "C" fn c2pa_add_manifest_to_file(
     dest_path: *const c_char,
     manifest: *const c_char,
     signer_info: SignerInfoC,
-    //signer: &mut Box<dyn Signer>,
     side_car: bool,
     remote_url: *const c_char,
 ) -> *mut c_char {
@@ -222,12 +194,3 @@ pub unsafe extern "C" fn c2pa_release_string(s: *mut c_char) {
     }
     let _release = CString::from_raw(s);
 }
-
-// Releases a Signer allocated by Rust
-//
-// # Safety
-// can only be released once and is invalid after this call
-// #[no_mangle]
-// pub unsafe extern "C" fn release_signer(signer: *mut Box<dyn Signer>) {
-//     let _release = Box::from_raw(signer);
-// }

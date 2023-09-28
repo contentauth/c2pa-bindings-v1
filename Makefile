@@ -24,17 +24,12 @@ swift: release
 build_c: 
 	$(CC) $(CFLAGS) src/main.c -o target/ctest -lc2pa_uniffi -L./target/release 
 
-build_node: release
-	cd tests/nodejs && npm install
-
 test_c: release build_c
 	target/ctest
 
 test_python: release
 	$(PYTHON) tests/test.py
+	$(PYTHON) tests/training.py
 
-test_node: release build_node
-	cd tests/nodejs && npm start
-
-test: test_c test_python test_node
+test: test_c test_python
 
