@@ -14,6 +14,7 @@
 import json
 import os
 import sys
+import tempfile
 PROJECT_PATH = os.getcwd()
 SOURCE_PATH = os.path.join(
     PROJECT_PATH,"target","python"
@@ -81,15 +82,35 @@ class SignerCallback(c2pa.SignerCallback):
         self.sign = callback
         super().__init__()
 
-    #def sign(self, data: bytes) -> bytes:
-    #    open("data.bin", "wb").write(data)
-    #   os.system("openssl dgst -sha256 -sign tests/fixtures/ps256.pem -out signature.sig data.bin")
-    #    return open("signature.sig", "rb").read()
 
-def sign(data: bytes) -> bytes:
-    open("data.bin", "wb").write(data)
-    os.system("openssl dgst -sha256 -sign tests/fixtures/ps256.pem -out signature.sig data.bin")
-    return open("signature.sig", "rb").read()
+# Example of using openssl in an os shell to sign data using Ps256
+# the openssl command line tool must be installed for this to work
+def sign_ps256_shell(data: bytes, key_path: str) -> bytes:
+    with tempfile.NamedTemporaryFile() as bytes:
+        bytes.write(data)
+    signature = tempfile.NamedTemporaryFile()
+    os.system("openssl dgst -sha256 -sign {} -out {} {}".format(key_path, signature.name, bytes.name))
+    return signature.read()
+
+# Example of using python crypto to sign data using openssl with Ps256
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+
+def sign_ps256(data: bytes, key_path: str) -> bytes:
+    with open(key_path, "rb") as key_file:
+        private_key = serialization.load_pem_private_key(
+            key_file.read(),
+            password=None,
+        )
+    signature = private_key.sign(
+        data,
+        padding.PSS(
+            mgf=padding.MGF1(hashes.SHA256()),
+            salt_length=padding.PSS.MAX_LENGTH
+        ),
+        hashes.SHA256()
+    )
+    return signature
 
 class LocalSigner:
 

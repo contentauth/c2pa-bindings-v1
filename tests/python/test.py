@@ -90,10 +90,9 @@ manifestDefinition = {
 
 # Define a function that will sign the data using openssl
 # and return the signature as a byte array
+# This could be implemented on a server using an HSM
 def sign_ps256(data: bytes) -> bytes:
-    open("target/data.bin", "wb").write(data)
-    os.system("openssl dgst -sha256 -sign tests/fixtures/ps256.pem -out target/signature.sig target/data.bin")
-    return open("target/signature.sig", "rb").read()
+    return c2pa_api.sign_ps256(data, "tests/fixtures/ps256.pem")
 
 # load the public keys from a pem file
 pemFile = os.path.join(PROJECT_PATH,"tests","fixtures","ps256.pub")

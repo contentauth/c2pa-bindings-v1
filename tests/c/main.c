@@ -19,7 +19,7 @@
 
 const char * asset_path = "tests/fixtures/A.jpg";
 
-
+/// @brief A minimal manifest definition JSON string for testing
 const char* manifest_json = "{\
     \"claim_generator\":\"c-test\",\
     \"title\":\"C Test Image\",\

@@ -81,6 +81,12 @@ impl Stream for Box<dyn Stream> {
     }
 }
 
+impl AsMut<dyn Stream> for dyn Stream {
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
 pub struct StreamAdapter<'a> {
     pub stream: &'a mut dyn Stream,
 }
