@@ -52,18 +52,18 @@ impl ManifestBuilder {
         }
     }
 
+    fn unlock_write(&self) -> Result<std::sync::RwLockWriteGuard<Manifest>> {
+        self.manifest.try_write().map_err(|_| C2paError::RwLock)
+    }
+
     pub fn from_json(&self, json: &str) -> Result<()> {
-        let manifest = c2pa::Manifest::from_json(json).map_err(C2paError::Sdk)?;
-        if let Ok(mut m) = self.manifest.try_write() {
-            *m = manifest;
-        } else {
-            return Err(C2paError::RwLock);
-        };
+        *self.unlock_write()? = c2pa::Manifest::from_json(json).map_err(C2paError::Sdk)?;
         Ok(())
     }
 
-    fn _set_format(&mut self, _format: &str) -> &mut Self {
-        self
+    pub fn set_format(&mut self, format: &str) -> Result<&mut Self> {
+        self.unlock_write()?.set_format(format);
+        Ok(self)
     }
 
     fn _set_title(&mut self, _title: &str) -> &mut Self {
@@ -87,7 +87,7 @@ impl ManifestBuilder {
         signer: &C2paSigner,
         input_mut: &dyn Stream,
         output_mut: &dyn Stream,
-    ) -> Result<()> {
+    ) -> Result<Vec<u8>> {
         let mut input = StreamAdapter::from(input_mut);
         let mut output = StreamAdapter::from(output_mut);
         self.sign(signer, &mut input, &mut output)
@@ -98,18 +98,12 @@ impl ManifestBuilder {
         signer: &dyn Signer,
         input: &mut dyn CAIRead,
         output: &mut dyn CAIReadWrite,
-    ) -> Result<()> {
-        if let Ok(mut manifest) = self.manifest.try_write() {
-            let format = manifest.format().to_string();
-            let result = manifest
-                .embed_stream(&format, input, signer)
-                .map_err(C2paError::Sdk)?;
-
-            output.write_all(&result).map_err(C2paError::Io)?;
-            Ok(())
-        } else {
-            Err(C2paError::RwLock)
-        }
+    ) -> Result<Vec<u8>> {
+        let mut manifest = self.unlock_write()?;
+        let format = manifest.format().to_string();
+        manifest
+            .embed_to_stream( &format, input, output, signer)
+            .map_err(C2paError::Sdk)
     }
 }
 
@@ -123,7 +117,11 @@ mod tests {
     {
         "claim_generator": "test_generator",
         "format": "image/jpeg",
-        "title": "test_title"
+        "title": "test_title",
+        "thumbnail": {
+            "format": "image/jpeg",
+            "identifier": "thumbnail"
+        }
     }
     "#;
 
