@@ -12,8 +12,7 @@ name = "uniffi_bindgen"
 path = "src/bin/uniffi_bindgen.rs"
 
 [dependencies]
-c2pa = {git="https://github.com/contentauth/c2pa-rs.git",branch="gpeacock/api_tweaks", features = [ "add_thumbnails", "openssl_sign"]}
-#c2pa = {path="../c2pa-rs/sdk", features = [ "add_thumbnails", "openssl_sign"]}
+c2pa = {version="0.28.3" , features = [ "add_thumbnails", "openssl_sign"]}
 serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 serde_json = "1.0"
