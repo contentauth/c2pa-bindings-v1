@@ -33,16 +33,14 @@ class TestManifestStoreReader(unittest.TestCase):
 
     def test_normal_read(self):
         with open(testPath, "rb") as file:
-            reader = c2pa_api.C2paStream(file)
-            manifestStore = c2pa_api.ManifestStoreReader()
-            json = manifestStore.read("image/jpeg",reader)
+            manifestStore = c2pa_api.ManifestStoreReader("image/jpeg",file)
+            json = manifestStore.read()
             self.assertIn("C.jpg", json)
 
     def test_normal_read_and_parse(self):
         with open(testPath, "rb") as file:
-            reader = c2pa_api.C2paStream(file)
-            manifestStore = c2pa_api.ManifestStoreReader()
-            manifestStore.read("image/jpeg",reader)
+            manifestStore = c2pa_api.ManifestStoreReader("image/jpeg",file)
+            manifestStore.read()
             json = manifestStore.json()
             manifest_store = c2pa_api.ManifestStore.from_json(json)
             title= manifest_store.manifests[manifest_store.activeManifest].title
@@ -55,9 +53,54 @@ class TestManifestStoreReader(unittest.TestCase):
     def test_reader_bad_format(self):
         with self.assertRaises(c2pa_api.c2pa.StreamError.Other):
             with open(testPath, "rb") as file:
-                reader = c2pa_api.C2paStream(file)
-                manifestStore = c2pa_api.ManifestStoreReader()
-                json = manifestStore.read("badFormat",reader)
+                manifestStore = c2pa_api.ManifestStoreReader("badFormat",file)
+                json = manifestStore.read()
+
+class TestManifestBuilder(unittest.TestCase):
+    # Define a manifest as a dictionary
+    manifestDefinition = {
+        "claim_generator": "python_test",
+        "claim_generator_info": [{
+            "name": "python_test",
+            "version": "0.0.1",
+        }],
+        "format": "image/jpeg",
+        "title": "Python Test Image",
+        "ingredients": [],
+        "assertions": [
+            {   'label': 'stds.schema-org.CreativeWork',
+                'data': {
+                    '@context': 'http://schema.org/',
+                    '@type': 'CreativeWork',
+                    'author': [
+                        {   '@type': 'Person',
+                            'name': 'Gavin Peacock'
+                        }
+                    ]
+                },
+                'kind': 'Json'
+            }
+        ]
+    }
+
+    def sign_ps256(data: bytes) -> bytes:
+        return c2pa_api.sign_ps256(data, "tests/fixtures/ps256.pem")
+
+    # load the public keys from a pem file
+    pemFile = os.path.join(PROJECT_PATH,"tests","fixtures","ps256.pub")
+    certs = open(pemFile,"rb").read()
+
+    # Create a local signer from a certificate pem file
+    signer = c2pa_api.LocalSigner.from_settings(sign_ps256, "ps256", certs, "http://timestamp.digicert.com")
+
+    def test_normal_build(self):
+        with open(testPath, "rb") as file:
+            settings = c2pa_api.c2pa.ManifestBuilderSettings("python-generator") 
+            builder = c2pa_api.ManifestBuilder(settings, TestManifestBuilder.signer, TestManifestBuilder.manifestDefinition)
+            json = builder.sign()
+            self.assertIn("C.jpg", json)
+
+
 
 if __name__ == '__main__':
     unittest.main()

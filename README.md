@@ -29,3 +29,8 @@ Run `make test_python`
 # Testing all
 
 Run `make test`
+
+
+# Note for ssl functionality you may need to update the python ssl package
+
+`pip install pyopenssl cryptography --upgrade`

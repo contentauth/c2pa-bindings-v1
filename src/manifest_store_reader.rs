@@ -11,11 +11,13 @@
 // specific language governing permissions and limitations under
 // each license.
 
-use crate::error::{C2paError, Result};
+use std::sync::RwLock;
+
 use c2pa::ManifestStore;
-use std::{
-    io::{Read, Seek, Write},
-    sync::RwLock,
+
+use crate::{
+    error::{C2paError, Result},
+    Stream, StreamAdapter,
 };
 
 struct ReaderSettings {}
@@ -32,8 +34,6 @@ impl ManifestStoreReader {
     /// # Returns
     /// * `ManifestStoreReader` - the new ManifestStoreReader
     ///
-    /// # Safety
-    /// The ManifestStoreReader is not thread safe. It is intended to be used
     pub fn new() -> Self {
         Self {
             _settings: ReaderSettings {},
@@ -49,7 +49,20 @@ impl ManifestStoreReader {
     /// * `Result<String>` - the json representation of the manifest store
     ///    or an error
     ///
-    pub fn read(&self, format: &str, mut stream: impl Read + Seek) -> Result<String> {
+    pub fn read_stream(&self, format: &str, stream: &dyn Stream) -> Result<String> {
+        let mut stream = StreamAdapter::from(stream);
+        self.read(format, &mut stream)
+    }
+
+    /// Reads the manifest store from a stream
+    /// # Arguments
+    /// * `format` - the format of the manifest store
+    /// * `stream` - the stream to read from
+    /// # Returns
+    /// * `Result<String>` - the json representation of the manifest store
+    ///    or an error
+    ///
+    pub fn read(&self, format: &str, stream: &mut dyn c2pa::CAIReadWrite) -> Result<String> {
         // todo: use ManifestStore::from_stream, when it exists
         let mut bytes = Vec::new();
         let _len = stream.read_to_end(&mut bytes).map_err(C2paError::Io)?;
@@ -98,6 +111,16 @@ impl ManifestStoreReader {
         }
     }
 
+    pub fn resource_write_stream(
+        &self,
+        manifest_label: &str,
+        id: &str,
+        stream: &dyn Stream,
+    ) -> Result<()> {
+        let mut stream = StreamAdapter::from(stream);
+        self.resource_write(manifest_label, id, &mut stream)
+    }
+
     /// writes a resource from the manifest store to the stream
     /// # Arguments
     /// * `manifest` - the manifest id
@@ -110,16 +133,35 @@ impl ManifestStoreReader {
         &self,
         manifest_label: &str,
         id: &str,
-        mut stream: impl Write + Seek,
+        stream: &mut dyn c2pa::CAIReadWrite,
     ) -> Result<()> {
-        self.resource(manifest_label, id).and_then(|bytes| {
-            stream.write_all(&bytes).map_err(C2paError::Io)
-            })
+        self.resource(manifest_label, id)
+            .and_then(|bytes| stream.write_all(&bytes).map_err(C2paError::Io))
     }
 }
 
 impl Default for ManifestStoreReader {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+
+mod tests {
+    use super::*;
+    use crate::test_stream::TestStream;
+
+    const IMAGE: &'static [u8] = include_bytes!("../tests/fixtures/C.jpg");
+
+    #[test]
+    fn test_manifest_store_reader() {
+        let mut input = TestStream::from_memory(IMAGE.to_vec());
+        let reader = ManifestStoreReader::new();
+        let json = reader.read_stream("image/jpeg", &mut input).unwrap();
+        println!("Json = {}", json);
+        assert!(json.contains("\"format\": \"image/jpeg\""));
+        assert!(json.contains("\"title\": \"C.jpg\""));
+        assert!(!json.contains("\"validation_status\":"));
     }
 }
