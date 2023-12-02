@@ -11,14 +11,27 @@
 // specific language governing permissions and limitations under
 // each license.
 
-use std::sync::RwLock;
+use std::{io::Cursor, sync::RwLock};
 
 use c2pa::ManifestStore;
 
-use crate::{
-    error::{C2paError, Result},
-    Stream, StreamAdapter,
-};
+use crate::{C2paError, Result, Stream, StreamAdapter};
+
+pub(crate) struct CAIReadWrapper<'a> {
+    pub reader: &'a mut dyn c2pa::CAIRead,
+}
+
+impl std::io::Read for CAIReadWrapper<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        self.reader.read(buf)
+    }
+}
+
+impl std::io::Seek for CAIReadWrapper<'_> {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.reader.seek(pos)
+    }
+}
 
 struct ReaderSettings {}
 
@@ -62,11 +75,21 @@ impl ManifestStoreReader {
     /// * `Result<String>` - the json representation of the manifest store
     ///    or an error
     ///
-    pub fn read(&self, format: &str, stream: &mut dyn c2pa::CAIReadWrite) -> Result<String> {
-        // todo: use ManifestStore::from_stream, when it exists
+    pub fn read(&self, format: &str, stream: &mut dyn c2pa::CAIRead) -> Result<String> {
+        // todo: use ManifestStore::f
         let mut bytes = Vec::new();
-        let _len = stream.read_to_end(&mut bytes).map_err(C2paError::Io)?;
-        let store = ManifestStore::from_bytes(format, &bytes, true).map_err(C2paError::Sdk)?;
+        stream
+            .seek(std::io::SeekFrom::End(0))
+            .map_err(C2paError::from)?;
+        stream
+            .seek(std::io::SeekFrom::Start(0))
+            .map_err(C2paError::from)?;
+        let _len = stream.read_to_end(&mut bytes).map_err(C2paError::from)?;
+        let bytes = CAIReadWrapper {
+            reader: &mut Cursor::new(bytes),
+        };
+        let stream = bytes.reader;
+        let store = ManifestStore::from_stream(format, stream, true).map_err(C2paError::from)?;
         let json = store.to_string();
         if let Ok(mut st) = self.store.try_write() {
             *st = store;
@@ -85,7 +108,7 @@ impl ManifestStoreReader {
         self.store
             .try_read()
             .map(|store| (*store).to_string())
-            .map_err(|_e| C2paError::RwLock)
+            .map_err(|_e| C2paError::Other("RWLock".to_string()))
     }
 
     /// returns a resource from the manifest store
@@ -100,9 +123,9 @@ impl ManifestStoreReader {
             match store.manifests().get(manifest) {
                 Some(manifest) => match manifest.resources().get(id) {
                     Ok(r) => Ok(r.into_owned()),
-                    Err(e) => Err(C2paError::Sdk(e)),
+                    Err(e) => Err(C2paError::from(e)),
                 },
-                None => Err(C2paError::Sdk(c2pa::Error::ResourceNotFound(
+                None => Err(C2paError::from(c2pa::Error::ResourceNotFound(
                     manifest.to_string(),
                 ))),
             }
@@ -136,7 +159,7 @@ impl ManifestStoreReader {
         stream: &mut dyn c2pa::CAIReadWrite,
     ) -> Result<()> {
         self.resource(manifest_label, id)
-            .and_then(|bytes| stream.write_all(&bytes).map_err(C2paError::Io))
+            .and_then(|bytes| stream.write_all(&bytes).map_err(C2paError::from))
     }
 }
 

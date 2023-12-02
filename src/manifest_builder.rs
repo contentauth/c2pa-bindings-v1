@@ -16,9 +16,8 @@ use std::{collections::HashMap, sync::RwLock};
 use c2pa::{CAIRead, CAIReadWrite, Manifest, Signer};
 
 use crate::{
-    error::{C2paError, Result},
     stream::{Stream, StreamAdapter},
-    C2paSigner,
+    C2paError, C2paSigner, Result,
 };
 
 pub struct ManifestBuilderSettings {
@@ -57,7 +56,7 @@ impl ManifestBuilder {
     }
 
     pub fn from_json(&self, json: &str) -> Result<()> {
-        *self.unlock_write()? = c2pa::Manifest::from_json(json).map_err(C2paError::Sdk)?;
+        *self.unlock_write()? = c2pa::Manifest::from_json(json).map_err(C2paError::from)?;
         Ok(())
     }
 
@@ -74,11 +73,14 @@ impl ManifestBuilder {
         self
     }
 
-    pub fn add_resource(&mut self, _id: &str, _resource: &[u8]) -> Result<&Self> {
+    pub fn add_resource(&mut self, id: &str, resource: &[u8]) -> Result<&Self> {
+        self.unlock_write()?.resources_mut().add(id, resource)?;
         Ok(self)
     }
 
     pub fn add_resource_stream(&mut self, _id: &str, _stream: Box<dyn Stream>) -> Result<&Self> {
+        // let buf = _stream.read_stream(65565).map_err(C2paError::from)?;
+        // self.unlock_write()?.resources_mut().add(_id, _stream);
         Ok(self)
     }
 
@@ -102,8 +104,8 @@ impl ManifestBuilder {
         let mut manifest = self.unlock_write()?;
         let format = manifest.format().to_string();
         manifest
-            .embed_to_stream( &format, input, output, signer)
-            .map_err(C2paError::Sdk)
+            .embed_to_stream(&format, input, output, signer)
+            .map_err(C2paError::from)
     }
 }
 
@@ -134,23 +136,24 @@ mod tests {
         let settings = ManifestBuilderSettings {
             generator: "test".to_string(),
         };
-        let builder = ManifestBuilder::new(&settings);
+        let mut builder = ManifestBuilder::new(&settings);
         builder
             .from_json(MANIFEST_JSON)
             .expect("Failed to load manifest Json");
+        builder.add_resource("thumbnail", &IMAGE.to_vec()).expect("Failed to add thumbnail stream");
         let mut input = TestStream::from_memory(IMAGE.to_vec());
         let mut input = StreamAdapter::from_stream_mut(&mut input);
         //let mut output = Cursor::new(Vec::new());
         let mut output = TestStream::new();
         let mut output = StreamAdapter::from_stream_mut(&mut output);
         let signer = c2pa::create_signer::from_keys(CERTS, P_KEY, c2pa::SigningAlg::Ps256, None)
-            .map_err(C2paError::Sdk)
+            .map_err(C2paError::from)
             .expect("Failed to create signer");
         builder
             .sign(&*signer, &mut input, &mut output)
             .expect("Failed to sign");
         let len = output.seek(std::io::SeekFrom::End(0)).unwrap();
-        assert_eq!(len, 134165);
+        assert_eq!(len, 142467);
     }
 
     #[test]
@@ -158,10 +161,11 @@ mod tests {
         let settings = ManifestBuilderSettings {
             generator: "test".to_string(),
         };
-        let builder = ManifestBuilder::new(&settings);
+        let mut builder = ManifestBuilder::new(&settings);
         builder
             .from_json(MANIFEST_JSON)
             .expect("Failed to load manifest Json");
+        builder.add_resource("thumbnail", &IMAGE.to_vec()).expect("Failed to add thumbnail stream");
         let mut input = TestStream::from_memory(IMAGE.to_vec());
         let mut output = TestStream::new();
         let test_signer = Box::new(TestSigner::new());
@@ -172,6 +176,6 @@ mod tests {
             .sign_stream(&signer, &mut input, &mut output)
             .expect("Failed to sign");
         let len = output.seek_stream(0, SeekMode::End).unwrap();
-        assert_eq!(len, 143141);
+        assert_eq!(len, 151443);
     }
 }

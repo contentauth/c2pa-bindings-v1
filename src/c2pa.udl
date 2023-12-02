@@ -6,13 +6,23 @@ namespace c2pa {
 
 [Error]
 enum C2paError {
-  "Json",
+  "Assertion",
+  "AssertionNotFound",
+  "Decoding",
+  "Encoding",
+  "FileNotFound",
   "Io",
-  "Ffi",
+  "Json",
+  "Manifest",
+  "ManifestNotFound",
+  "NotSupported",
   "Other",
-  "Sdk",
-  "Stream",
-  "RwLock"
+  "NullParameter",
+  "RemoteManifest",
+  "ResourceNotFound",
+  "RwLock",
+  "Signature",
+  "Verify"
 };
 
 [Error]
