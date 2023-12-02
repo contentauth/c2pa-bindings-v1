@@ -225,7 +225,7 @@ unsafe fn to_c_string(s: String) -> *mut c_char {
     match CString::new(s) {
         Ok(c_str) => c_str.into_raw(),
         Err(e) => {
-            C2paError::Ffi(e.to_string()).set_last();
+            C2paError::NullParameter(e.to_string()).set_last();
             std::ptr::null_mut()
         }
     }

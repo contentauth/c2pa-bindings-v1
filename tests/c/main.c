@@ -81,7 +81,7 @@ int seeker(size_t context,long int offset, SeekMode whence) {
     };
     //printf("seeker: context = %0lx, offset = %ld, whence = %d\n", context, offset, whence);
     long int result = fseek((FILE*)context, offset, whence);
-    //printf("seeker: result = %ld, %s\n", result, strerror(errno));
+    //printf("seeker: result = %ld, %s\n", result, result ? strerror(errno): "");
     return result;
 }
 

@@ -14,9 +14,9 @@
 use c2pa::Error::OpenSslError;
 use openssl::{error::ErrorStack, hash::MessageDigest, pkey::PKey, rsa::Rsa};
 
-use crate::error::{C2paError, Result};
 use crate::signer::{SignerCallback, SignerConfig};
 use crate::stream::{StreamError, StreamResult};
+use crate::{C2paError, Result};
 
 pub(crate) struct TestSigner {
     private_key: Vec<u8>,
@@ -48,7 +48,7 @@ impl SignerCallback for TestSigner {
 }
 
 pub fn local_sign(data: &[u8], pkey: &[u8]) -> Result<Vec<u8>> {
-    openssl_rsa256_sign(data, pkey).map_err(|e| C2paError::Sdk(OpenSslError(e)))
+    openssl_rsa256_sign(data, pkey).map_err(|e| C2paError::from(OpenSslError(e)))
 }
 
 fn openssl_rsa256_sign(data: &[u8], pkey: &[u8]) -> std::result::Result<Vec<u8>, ErrorStack> {

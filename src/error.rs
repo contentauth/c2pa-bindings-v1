@@ -1,66 +1,120 @@
-// Copyright 2022 Adobe. All rights reserved.
+// Copyright 2023 Adobe. All rights reserved.
 // This file is licensed to you under the Apache License,
 // Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
 // or the MIT license (http://opensource.org/licenses/MIT),
 // at your option.
-
 // Unless required by applicable law or agreed to in writing,
 // this software is distributed on an "AS IS" BASIS, WITHOUT
 // WARRANTIES OR REPRESENTATIONS OF ANY KIND, either express or
 // implied. See the LICENSE-MIT and LICENSE-APACHE files for the
 // specific language governing permissions and limitations under
 // each license.
+
 use std::cell::RefCell;
 
 use thiserror::Error;
+pub type Result<T> = std::result::Result<T, Error>;
 
-// LAST_ERROR handling borrowed Copyright (c) 2018 Michael Bryan
+// LAST_ERROR handling borrowed from Copyright (c) 2018 Michael Bryan
 thread_local! {
-    static LAST_ERROR: RefCell<Option<C2paError>> = RefCell::new(None);
+    static LAST_ERROR: RefCell<Option<Error>> = RefCell::new(None);
 }
-
-// /// Take the most recent error, clearing `LAST_ERROR` in the process.
-// pub fn take_last_error() -> Option<C2paError> {
-//     LAST_ERROR.with(|prev| prev.borrow_mut().take())
-// }
-
-// /// Update the `thread_local` error, taking ownership of the `Error`.
-// pub fn update_last_error<E: Into<C2paError>>(err: E) {
-//     LAST_ERROR.with(|prev| *prev.borrow_mut() = Some(err.into()));
-// }
-
-// /// Peek at the most recent error and get its error message as a Rust `String`.
-// pub fn error_message() -> Option<String> {
-//     LAST_ERROR.with(|prev| prev.borrow().as_ref().map(|e| format!("{:#}", e)))
-// }
-
-use crate::StreamError;
 
 #[derive(Error, Debug)]
-pub enum C2paError {
-    #[error(transparent)]
-    Json(#[from] serde_json::Error),
-
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-
-    #[error(transparent)]
-    Sdk(#[from] c2pa::Error),
-
-    #[error("Api Error: {0}")]
-    Ffi(String),
-
-    #[error("Other Error: {0}")]
+/// Defines all possible errors that can occur in this library
+pub enum Error {
+    #[error("Assertion {0}")]
+    Assertion(String),
+    #[error("AssertionNotFound {0}")]
+    AssertionNotFound(String),
+    #[error("Decoding {0}")]
+    Decoding(String),
+    #[error("Encoding {0}")]
+    Encoding(String),
+    #[error("FileNotFound {0}")]
+    FileNotFound(String),
+    #[error("Io {0}")]
+    Io(String),
+    #[error("Json {0}")]
+    Json(String),
+    #[error("Manifest {0}")]
+    Manifest(String),
+    #[error("ManifestNotFound {0}")]
+    ManifestNotFound(String),
+    #[error("NotSupported {0}")]
+    NotSupported(String),
+    #[error("Other {0}")]
     Other(String),
-
-    #[error(transparent)]
-    Stream(StreamError),
-
-    #[error("Read Write Lock failure")]
+    #[error("NullParameter {0}")]
+    NullParameter(String),
+    #[error("Remote {0}")]
+    RemoteManifest(String),
+    #[error("ResourceNotFound {0}")]
+    ResourceNotFound(String),
+    #[error("BindingLock")]
     RwLock,
+    #[error("Signature {0}")]
+    Signature(String),
+    #[error("Verify {0}")]
+    Verify(String),
 }
 
-impl C2paError {
+impl Error {
+    // Convert c2pa errors to published API errors
+    #[allow(unused_variables)]
+    pub(crate) fn from_c2pa_error(err: c2pa::Error) -> Self {
+        use c2pa::Error::*;
+        let err_str = err.to_string();
+        match err {
+            c2pa::Error::AssertionMissing { url } => Self::AssertionNotFound("".to_string()),
+            AssertionInvalidRedaction
+            | AssertionRedactionNotFound
+            | AssertionUnsupportedVersion => Self::Assertion(err_str),
+            ClaimAlreadySigned
+            | ClaimUnsigned
+            | ClaimMissingSignatureBox
+            | ClaimMissingIdentity
+            | ClaimVersion
+            | ClaimInvalidContent
+            | ClaimMissingHardBinding
+            | ClaimSelfRedact
+            | ClaimDisallowedRedaction
+            | UpdateManifestInvalid
+            | TooManyManifestStores => Self::Manifest(err_str),
+            ClaimMissing { label } => Self::ManifestNotFound(err_str),
+            AssertionDecoding(_) | ClaimDecoding => Self::Decoding(err_str),
+            AssertionEncoding | XmlWriteError | ClaimEncoding => Self::Encoding(err_str),
+            InvalidCoseSignature { coset_error } => Self::Signature(err_str),
+            CoseSignatureAlgorithmNotSupported
+            | CoseMissingKey
+            | CoseX5ChainMissing
+            | CoseInvalidCert
+            | CoseSignature
+            | CoseVerifier
+            | CoseCertExpiration
+            | CoseCertRevoked
+            | CoseInvalidTimeStamp
+            | CoseTimeStampValidity
+            | CoseTimeStampMismatch
+            | CoseTimeStampGeneration
+            | CoseTimeStampAuthority
+            | CoseSigboxTooSmall
+            | InvalidEcdsaSignature => Self::Signature(err_str),
+            RemoteManifestFetch(_) | RemoteManifestUrl(_) => Self::RemoteManifest(err_str),
+            JumbfNotFound => Self::ManifestNotFound(err_str),
+            BadParam(_) | MissingFeature(_) => Self::Other(err_str),
+            IoError(_) => Self::Io(err_str),
+            JsonError(e) => Self::Json(err_str),
+            NotFound | ResourceNotFound(_) | MissingDataBox => Self::ResourceNotFound(err_str),
+            FileNotFound(_) => Self::FileNotFound(err_str),
+            UnsupportedType => Self::NotSupported(err_str),
+            ClaimVerification(_) | InvalidClaim(_) | JumbfParseError(_) => Self::Verify(err_str),
+            #[cfg(feature = "add_thumbnails")]
+            ImageError => Self::ImageError(err_str),
+            _ => Self::Other(err_str),
+        }
+    }
+
     /// Returns the last error as String
     pub fn last_message() -> Option<String> {
         LAST_ERROR.with(|prev| prev.borrow().as_ref().map(|e| e.to_string()))
@@ -72,21 +126,19 @@ impl C2paError {
     }
 
     /// Takes the the last error and clears it
-    pub fn take_last() -> Option<C2paError> {
+    pub fn take_last() -> Option<Error> {
         LAST_ERROR.with(|prev| prev.borrow_mut().take())
     }
 }
 
-impl From<StreamError> for C2paError {
-    fn from(e: StreamError) -> Self {
-        match e {
-            StreamError::Io { reason } => {
-                Self::Io(std::io::Error::new(std::io::ErrorKind::Other, reason))
-            }
-            StreamError::Other { reason } => Self::Ffi(reason),
-            StreamError::InternalStreamError => Self::Stream(e),
-        }
+impl From<c2pa::Error> for Error {
+    fn from(err: c2pa::Error) -> Self {
+        Self::from_c2pa_error(err)
     }
 }
 
-pub type Result<T> = std::result::Result<T, C2paError>;
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
+        Self::Io(err.to_string())
+    }
+}

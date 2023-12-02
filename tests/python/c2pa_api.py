@@ -55,6 +55,7 @@ class C2paStream(c2pa.Stream):
         self.stream = stream
     
     def read_stream(self, length: int) -> bytes:   
+        #print("Reading " + str(length) + " bytes")
         return self.stream.read(length)
 
     def seek_stream(self, pos: int, mode: c2pa.SeekMode) -> int:
@@ -67,6 +68,7 @@ class C2paStream(c2pa.Stream):
         return self.stream.seek(pos, whence)
 
     def write_stream(self, data: str) -> int:
+        #print("Writing " + str(len(data)) + " bytes")
         return self.stream.write(data)
 
     def flush_stream(self) -> None:

@@ -14,8 +14,8 @@
 use std::str::FromStr;
 use std::sync::RwLock;
 
-use crate::error::{C2paError, Result};
 use crate::stream::StreamResult;
+use crate::{C2paError, Result};
 
 /// Configuration for a Signer
 #[repr(C)]

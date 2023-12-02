@@ -23,7 +23,7 @@ mod signer;
 mod stream;
 
 pub use c_api::C2paStream;
-pub use error::{C2paError, Result};
+pub use error::{Error as C2paError, Result};
 pub use ingredient_builder::IngredientBuilder;
 pub use manifest_builder::{ManifestBuilder, ManifestBuilderSettings};
 pub use manifest_store_reader::ManifestStoreReader;

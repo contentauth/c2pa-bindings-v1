@@ -15,7 +15,7 @@ use std::io::{Read, Seek, SeekFrom, Write};
 
 use thiserror::Error;
 
-use crate::error::C2paError;
+use crate::C2paError;
 
 pub type StreamResult<T> = std::result::Result<T, StreamError>;
 
