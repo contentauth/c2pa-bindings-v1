@@ -103,7 +103,7 @@ signer = c2pa_api.LocalSigner.from_settings(sign_ps256, "ps256", certs, "http://
 
 # Example of signing a manifest store into a file
 try:
-    settings = c2pa_api.c2pa.ManifestBuilderSettings("python-generator") 
+    settings = c2pa_api.c2pa.ManifestBuilderSettings(generator = "python-generator") 
     c2pa_api.ManifestBuilder.sign_with_files(settings, signer, manifestDefinition, testFile, outFile)
     #builder = c2pa_api.ManifestBuilder(settings, signer, manifestDefinition)
     #c2pa_api.ManifestBuilder.sign(testFile, outFile) 

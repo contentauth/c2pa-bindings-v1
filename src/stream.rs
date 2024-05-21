@@ -88,7 +88,7 @@ impl AsMut<dyn Stream> for dyn Stream {
 }
 
 pub struct StreamAdapter<'a> {
-    pub stream: &'a mut dyn Stream,
+    pub stream: &'a dyn Stream,
 }
 
 impl<'a> StreamAdapter<'a> {
@@ -100,14 +100,10 @@ impl<'a> StreamAdapter<'a> {
 impl<'a> From<&'a dyn Stream> for StreamAdapter<'a> {
     fn from(stream: &'a dyn Stream) -> Self {
         let stream = &*stream as *const dyn Stream as *mut dyn Stream;
-        let stream = unsafe { &mut *stream };
+        let stream = unsafe { & *stream };
         Self { stream }
     }
 }
-
-impl<'a> c2pa::CAIRead for StreamAdapter<'a> {}
-
-impl<'a> c2pa::CAIReadWrite for StreamAdapter<'a> {}
 
 impl<'a> Read for StreamAdapter<'a> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
