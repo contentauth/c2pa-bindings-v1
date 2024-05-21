@@ -124,8 +124,8 @@ class LocalSigner:
     def signer(self):
         return self.signer
     
-    def from_settings(sign_callback, alg, certs, timestamp_url=None):
-        config = c2pa.SignerConfig(alg, certs, timestamp_url)
+    def from_settings(sign_callback, alg, certs, timestamp_url=None, use_ocsp = False):
+        config = c2pa.SignerConfig(alg = alg, certs = certs, time_authority_url = timestamp_url, use_ocsp = use_ocsp)
         return LocalSigner(config, sign_callback).signer
 
 class ManifestBuilder(c2pa.ManifestBuilder):
