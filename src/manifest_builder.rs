@@ -140,7 +140,9 @@ mod tests {
         builder
             .from_json(MANIFEST_JSON)
             .expect("Failed to load manifest Json");
-        builder.add_resource("thumbnail", &IMAGE.to_vec()).expect("Failed to add thumbnail stream");
+        builder
+            .add_resource("thumbnail", &IMAGE.to_vec())
+            .expect("Failed to add thumbnail stream");
         let mut input = TestStream::from_memory(IMAGE.to_vec());
         let mut input = StreamAdapter::from_stream_mut(&mut input);
         //let mut output = Cursor::new(Vec::new());
@@ -165,7 +167,9 @@ mod tests {
         builder
             .from_json(MANIFEST_JSON)
             .expect("Failed to load manifest Json");
-        builder.add_resource("thumbnail", &IMAGE.to_vec()).expect("Failed to add thumbnail stream");
+        builder
+            .add_resource("thumbnail", &IMAGE.to_vec())
+            .expect("Failed to add thumbnail stream");
         let mut input = TestStream::from_memory(IMAGE.to_vec());
         let mut output = TestStream::new();
         let test_signer = Box::new(TestSigner::new());
